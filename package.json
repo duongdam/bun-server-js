@@ -1,0 +1,17 @@
+{
+  "name": "bun-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "dev": "bun run --hot server.js"
+  },
+  "author": "duongdamdpa",
+  "license": "ISC",
+  "dependencies": {
+    "bun": "^0.5.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2"
+  }
+}
