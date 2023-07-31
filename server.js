@@ -12,12 +12,12 @@ app.use(bodyParser.json({limit: '50mb'}));
 app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 app.use(express.json());
 
-globalThis.count = globalThis.count ?? 0;
-
 // console.log(process.env);
 app.get('/', (req, res, next) => {
-    res.status(200).send(`Bun serve reloaded! ${globalThis.count++}`);
+    res.status(200).send(`Welcome to the API!`);
 });
+
+app.use('/api', require('./routes/api'));
 
 app.listen(PORT, function () {
     console.log('Server is running on Port:', PORT);
