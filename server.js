@@ -17,7 +17,7 @@ app.get('/', (req, res, next) => {
     res.status(200).send(`Welcome to the API!`);
 });
 
-app.use('/api', require('./routes/api'));
+app.use('/api', require('./routes'));
 
 app.listen(PORT, function () {
     console.log('Server is running on Port:', PORT);
