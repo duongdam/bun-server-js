@@ -1,4 +1,4 @@
-// server.js
+// server.ts
 require('dotenv').config();
 import express from 'express';
 import bodyParser from "express";
