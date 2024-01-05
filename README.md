@@ -1,4 +1,4 @@
-## Bun 1.0.21 server js express
+## Bun 1.0.21 server ts express
 
 ### START and RUN
 

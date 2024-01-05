@@ -1,5 +1,4 @@
-
-const getUserInfo = async (req, res) => {
+const getUserInfo = async (_req: any, res: any) => {
     try {
         const user = {
             name: 'PA. Duong Dam',
@@ -16,4 +15,16 @@ const getUserInfo = async (req, res) => {
     }
 }
 
-module.exports = getUserInfo;
+const createUser = async (_req: any, res: any) => {
+    try {
+
+        res.status(200).json({message: 'Create User Success'});
+    } catch (error) {
+        console.log(error);
+        res.status(404).json({message: 'Create User Error'});
+    }
+}
+module.exports = {
+    getUserInfo,
+    createUser,
+};

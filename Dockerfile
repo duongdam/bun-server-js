@@ -9,11 +9,11 @@ COPY bun.lockb bun.lockb
 
 # Firebase staging
 #COPY firebase/stg.json stg.json
-
 # Firebase Production
+#COPY firebase/prod.json prod.json
 
 RUN bun install
-RUN bun build ./server.js --compile --outfile server
+RUN bun build ./server.ts --compile --outfile server
 
 # Reduce image size
 FROM  --platform=linux/amd64 oven/bun:latest
