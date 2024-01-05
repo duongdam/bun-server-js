@@ -3,7 +3,7 @@ FROM oven/bun:latest as build-stage
 WORKDIR /dist
 
 COPY . .
-COPY .env.stg .env
+COPY .env.production .env
 COPY package.json package.json
 COPY bun.lockb bun.lockb
 
@@ -13,10 +13,11 @@ COPY bun.lockb bun.lockb
 #COPY firebase/prod.json prod.json
 
 RUN bun install
-RUN bun build ./server.ts --compile --outfile server
+RUN bun build ./server.ts --outfile server --compile
 
 # Reduce image size
-FROM  --platform=linux/amd64 oven/bun:latest
+# FROM  --platform=linux/amd64 oven/bun:latest if error occurs with platform, but in v1.0.0 it should be fixed
+FROM oven/bun:latest
 
 WORKDIR /app
 
