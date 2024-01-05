@@ -25,5 +25,8 @@ COPY --from=build-stage /dist/.env ./.env
 COPY --from=build-stage /dist/server ./server
 
 EXPOSE 8080
+ENV PORT 8080
+# set hostname to localhost - Use when deploying to Google Cloud Run
+ENV HOSTNAME "0.0.0.0"
 
 CMD ["./server"]
