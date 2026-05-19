@@ -1,4 +1,4 @@
-import { SearchFilter } from '../value-objects/search-filter.vo';
+import type { SearchFilter } from '../value-objects/search-filter.vo';
 
 export interface SearchResultItem {
   chunkId: string;

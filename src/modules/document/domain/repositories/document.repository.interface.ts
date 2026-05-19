@@ -1,9 +1,9 @@
-import { Document } from '../entities/document.entity';
-import {
+import type { DocumentStatus } from '@prisma/client';
+import type {
   IBaseRepository,
   PaginatedResult,
 } from '../../../../shared/domain/base.repository.interface';
-import { DocumentStatus } from '@prisma/client';
+import type { Document } from '../entities/document.entity';
 
 export interface IDocumentRepository extends IBaseRepository<Document> {
   findByUserId(

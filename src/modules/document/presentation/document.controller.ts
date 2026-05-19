@@ -1,13 +1,17 @@
-import { UploadDocumentUseCase } from '../application/use-cases/upload-document.use-case';
-import { UploadDocumentSchema } from '../application/dtos/upload-document.dto';
-import { PrismaDocumentRepository } from '../infrastructure/prisma-document.repository';
-import { toDocumentResponseDto } from '../application/dtos/document-response.dto';
+import { DocumentStatus } from '@prisma/client';
+import { z } from 'zod';
+import { prisma } from '../../../shared/infrastructure/prisma/client';
 import { NotFoundError } from '../../../shared/middleware/error-handler.middleware';
+import { toDocumentResponseDto } from '../application/dtos/document-response.dto';
+import { UploadDocumentSchema } from '../application/dtos/upload-document.dto';
 import { ListDocumentsQuery } from '../application/queries/list-documents.query';
 import { DeleteDocumentUseCase } from '../application/use-cases/delete-document.use-case';
-import { ReindexDocumentUseCase, ReindexDocumentParams } from '../application/use-cases/reindex-document.use-case';
-import { prisma } from '../../../shared/infrastructure/prisma/client';
-import { z } from 'zod';
+import {
+  type ReindexDocumentParams,
+  ReindexDocumentUseCase,
+} from '../application/use-cases/reindex-document.use-case';
+import { UploadDocumentUseCase } from '../application/use-cases/upload-document.use-case';
+import { PrismaDocumentRepository } from '../infrastructure/prisma-document.repository';
 
 export class DocumentController {
   private uploadUseCase = new UploadDocumentUseCase();
@@ -25,9 +29,12 @@ export class DocumentController {
     userId: string,
     query: { page?: string; limit?: string; status?: string; tags?: string },
   ) {
-    const page = parseInt(query.page || '1', 10);
-    const limit = parseInt(query.limit || '10', 10);
-    const status = query.status as any; // Cast as enum string if valid
+    const page = Number.parseInt(query.page || '1', 10);
+    const limit = Number.parseInt(query.limit || '10', 10);
+    const status =
+      query.status && Object.values(DocumentStatus).includes(query.status as DocumentStatus)
+        ? (query.status as DocumentStatus)
+        : undefined;
     const tags = query.tags ? query.tags.split(',') : undefined;
 
     const result = await this.listQuery.execute({
@@ -35,7 +42,7 @@ export class DocumentController {
       page,
       limit,
       status,
-      tags
+      tags,
     });
 
     return {
@@ -68,7 +75,7 @@ export class DocumentController {
       chunkSize: z.number().int().min(100).max(4000).optional(),
       chunkOverlap: z.number().int().min(0).max(500).optional(),
       embeddingModel: z.string().optional(),
-      embeddingProvider: z.string().optional()
+      embeddingProvider: z.string().optional(),
     });
 
     let params: ReindexDocumentParams;
@@ -76,13 +83,21 @@ export class DocumentController {
       params = ReindexSchema.parse(body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw Object.assign(new Error('Validation failed'), { code: 'VALIDATION', details: error.errors });
+        throw Object.assign(new Error('Validation failed'), {
+          code: 'VALIDATION',
+          details: error.errors,
+        });
       }
       throw error;
     }
 
-    await this.reindexUseCase.execute(userId, id, params);
-    return { success: true, message: 'Document reindexing started' };
+    const { jobId } = await this.reindexUseCase.execute(userId, id, params);
+    return {
+      documentId: id,
+      jobId,
+      status: 'pending',
+      message: 'Re-indexing queued',
+    };
   }
 
   async getChunks(userId: string, id: string, query: { page?: string; limit?: string }) {
@@ -92,8 +107,8 @@ export class DocumentController {
       throw new NotFoundError('Document', id);
     }
 
-    const page = parseInt(query.page || '1', 10);
-    const limit = parseInt(query.limit || '10', 10);
+    const page = Number.parseInt(query.page || '1', 10);
+    const limit = Number.parseInt(query.limit || '10', 10);
     const skip = (page - 1) * limit;
 
     const [chunks, total] = await Promise.all([
@@ -109,10 +124,10 @@ export class DocumentController {
           pageNumber: true,
           tokenCount: true,
           metadata: true,
-          createdAt: true
-        }
+          createdAt: true,
+        },
       }),
-      prisma.documentChunk.count({ where: { documentId: id } })
+      prisma.documentChunk.count({ where: { documentId: id } }),
     ]);
 
     return {
@@ -121,8 +136,8 @@ export class DocumentController {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 }

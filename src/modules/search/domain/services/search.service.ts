@@ -1,5 +1,8 @@
-import { ISearchRepository, SearchResultItem } from '../repositories/search.repository.interface';
-import { SearchFilter } from '../value-objects/search-filter.vo';
+import type {
+  ISearchRepository,
+  SearchResultItem,
+} from '../repositories/search.repository.interface';
+import type { SearchFilter } from '../value-objects/search-filter.vo';
 
 export class SearchService {
   constructor(private readonly searchRepository: ISearchRepository) {}

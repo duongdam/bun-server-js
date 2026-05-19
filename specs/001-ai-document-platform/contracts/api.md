@@ -2,16 +2,165 @@
 
 **Version**: 1.0.0
 **Base URL**: `/api/v1`
-**Auth**: Bearer JWT required on all endpoints except `/health`
+**Auth**: Bearer JWT required on protected endpoints. Public: `/health`, `POST /auth/register`, `POST /auth/login`.
 
 ---
 
 ## Authentication
 
-All endpoints require:
+### POST /auth/register
+
+Create a new user account (self-registration; role is always `user`).
+
+**Request** (`application/json`):
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| email | string | ✅ | Valid email address |
+| password | string | ✅ | Minimum 8 characters |
+| displayName | string | ❌ | Optional display name |
+
+**Response 201 Created**:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": "7d",
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "role": "user",
+    "displayName": "Jane Doe"
+  }
+}
+```
+
+**Response 409 Conflict**:
+```json
+{
+  "error": "CONFLICT",
+  "message": "Email already registered"
+}
+```
+
+---
+
+### POST /auth/login
+
+Sign in with email and password.
+
+**Request** (`application/json`):
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| email | string | ✅ | Registered email |
+| password | string | ✅ | Account password |
+
+**Response 200 OK**: Same shape as register (`accessToken`, `expiresIn`, `user`).
+
+**Response 401 Unauthorized**:
+```json
+{
+  "error": "UNAUTHORIZED",
+  "message": "Invalid email or password"
+}
+```
+
+**Response 403 Forbidden** (deactivated account):
+```json
+{
+  "error": "FORBIDDEN",
+  "message": "Account is deactivated"
+}
+```
+
+---
+
+### GET /auth/me
+
+Returns the profile of the authenticated user.
+
+**Headers**: `Authorization: Bearer <jwt_token>`
+
+**Response 200 OK**:
+```json
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "role": "user",
+  "displayName": "Jane Doe"
+}
+```
+
+---
+
+### Protected endpoints
+
+All other `/api/v1/*` routes require:
 ```
 Authorization: Bearer <jwt_token>
 ```
+
+JWT claims: `sub` (user id), `role` (`admin` | `user` | `readonly`), `email`.
+
+---
+
+## Activity Log Endpoints
+
+### GET /activity-logs
+
+List audit log entries for the authenticated user (newest first).
+
+**Headers**: `Authorization: Bearer <jwt_token>`
+
+**Query Parameters**:
+
+| Param | Type | Description |
+|---|---|---|
+| domain | string | Filter by domain: `DOCUMENT`, `JOB`, `EMBEDDING` |
+| entityId | string | Filter by entity ID (document id, job id, etc.) |
+| action | string | Filter by action: `CREATED`, `UPDATED`, `DELETED`, `STATUS_CHANGED`, `STAGE_CHANGED`, `BATCH_COMPLETED`, `FAILED` |
+| from | string (ISO 8601) | Start of time range |
+| to | string (ISO 8601) | End of time range |
+| page | integer | Page number (default: 1) |
+| limit | integer | Page size (default: 20, max: 100) |
+
+**Response 200 OK**:
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "userId": "uuid",
+      "domain": "DOCUMENT",
+      "entityId": "uuid",
+      "action": "CREATED",
+      "message": "document.uploaded",
+      "metadata": { "filename": "report.pdf", "jobId": "uuid" },
+      "createdAt": "2026-05-19T12:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "total": 42,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 3
+  }
+}
+```
+
+**Recorded events** (non-exhaustive):
+
+| Message | Domain | Typical action |
+|---|---|---|
+| `document.uploaded` | DOCUMENT | CREATED |
+| `document.deleted` | DOCUMENT | DELETED |
+| `document.reindex_requested` | DOCUMENT | UPDATED |
+| `document.status_changed` | DOCUMENT | STATUS_CHANGED |
+| `job.started` | JOB | CREATED |
+| `job.stage_changed` | JOB | STAGE_CHANGED |
+| `job.completed` | JOB | STATUS_CHANGED |
+| `job.failed` | JOB | FAILED |
+| `embedding.batch_completed` | EMBEDDING | BATCH_COMPLETED |
 
 ---
 

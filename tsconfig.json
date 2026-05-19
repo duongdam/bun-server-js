@@ -18,6 +18,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "skipLibCheck": true,
+    "types": ["bun-types"],
     "paths": {
       "@/*": ["./src/*"],
       "@shared/*": ["./src/shared/*"],

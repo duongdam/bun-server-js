@@ -1,5 +1,6 @@
-import { IDocumentRepository } from '../../domain/repositories/document.repository.interface';
 import { NotFoundError } from '../../../../shared/middleware/error-handler.middleware';
+import { activityLogService } from '../../../activity-log/domain/services/activity-log.service';
+import type { IDocumentRepository } from '../../domain/repositories/document.repository.interface';
 
 export class DeleteDocumentUseCase {
   constructor(private readonly documentRepository: IDocumentRepository) {}
@@ -12,5 +13,14 @@ export class DeleteDocumentUseCase {
 
     // Prisma schema has onDelete: Cascade for DocumentChunks and Embeddings
     await this.documentRepository.delete(documentId);
+
+    await activityLogService.record({
+      userId,
+      domain: 'DOCUMENT',
+      entityId: documentId,
+      action: 'DELETED',
+      message: 'document.deleted',
+      metadata: { filename: doc.filename },
+    });
   }
 }

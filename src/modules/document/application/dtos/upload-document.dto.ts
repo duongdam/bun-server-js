@@ -5,8 +5,8 @@ export const UploadDocumentSchema = z.object({
   chunkingStrategy: z.enum(['recursive', 'semantic', 'token']).default('recursive'),
   chunkSize: z.coerce.number().min(64).max(2048).default(512),
   chunkOverlap: z.coerce.number().min(0).max(1024).default(50),
-  embeddingProvider: z.string().default(process.env['EMBEDDING_PROVIDER'] || 'openai'),
-  embeddingModel: z.string().default(process.env['EMBEDDING_MODEL'] || 'text-embedding-3-small'),
+  embeddingProvider: z.string().default(process.env.EMBEDDING_PROVIDER || 'openai'),
+  embeddingModel: z.string().default(process.env.EMBEDDING_MODEL || 'text-embedding-3-small'),
   tags: z.preprocess((val) => {
     if (typeof val === 'string') {
       try {

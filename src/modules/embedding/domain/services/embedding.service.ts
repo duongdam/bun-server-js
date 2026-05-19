@@ -1,29 +1,18 @@
-import { IEmbeddingProvider } from '../../infrastructure/providers/embedding-provider.interface';
-import { OpenAIEmbeddingProvider } from '../../infrastructure/providers/openai.provider';
-import { HuggingFaceEmbeddingProvider } from '../../infrastructure/providers/huggingface.provider';
-import { LocalEmbeddingProvider } from '../../infrastructure/providers/local.provider';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
+import { createEmbeddingProvider } from '../../infrastructure/create-embedding-provider';
+import type { IEmbeddingProvider } from '../../infrastructure/providers/embedding-provider.interface';
 
 export class EmbeddingService {
-  private provider: IEmbeddingProvider;
+  readonly provider: IEmbeddingProvider;
 
-  constructor() {
-    const providerType = process.env['EMBEDDING_PROVIDER']?.toLowerCase() || 'openai';
-
-    switch (providerType) {
-      case 'huggingface':
-        this.provider = new HuggingFaceEmbeddingProvider();
-        break;
-      case 'local':
-        this.provider = new LocalEmbeddingProvider();
-        break;
-      case 'openai':
-      default:
-        this.provider = new OpenAIEmbeddingProvider();
-        break;
-    }
+  constructor(provider?: IEmbeddingProvider) {
+    this.provider = provider ?? createEmbeddingProvider();
     logger.info(
-      { provider: this.provider.provider, model: this.provider.model },
+      {
+        provider: this.provider.provider,
+        model: this.provider.model,
+        dimension: this.provider.dimension,
+      },
       'Initialized Embedding Service',
     );
   }

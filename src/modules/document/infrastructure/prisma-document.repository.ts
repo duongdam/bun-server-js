@@ -1,12 +1,13 @@
-import { Document, DocumentProps } from '../domain/entities/document.entity';
-import { IDocumentRepository } from '../domain/repositories/document.repository.interface';
-import { prisma } from '../../../shared/infrastructure/prisma/client';
-import { DocumentStatus } from '@prisma/client';
-import { ChunkingConfig, ChunkingStrategy } from '../domain/value-objects/chunking-config.vo';
-import {
-  PaginatedResult,
+import type { DocumentStatus, Prisma, Document as PrismaDocument } from '@prisma/client';
+import type {
   FindAllOptions,
+  PaginatedResult,
 } from '../../../shared/domain/base.repository.interface';
+import { prisma } from '../../../shared/infrastructure/prisma/client';
+import { activityLogService } from '../../activity-log/domain/services/activity-log.service';
+import { Document, type DocumentProps } from '../domain/entities/document.entity';
+import type { IDocumentRepository } from '../domain/repositories/document.repository.interface';
+import { ChunkingConfig, type ChunkingStrategy } from '../domain/value-objects/chunking-config.vo';
 
 export class PrismaDocumentRepository implements IDocumentRepository {
   async findById(id: string): Promise<Document | null> {
@@ -39,7 +40,7 @@ export class PrismaDocumentRepository implements IDocumentRepository {
     ]);
 
     return {
-      data: data.map((d: any) => this.mapToDomain(d)),
+      data: data.map((d) => this.mapToDomain(d)),
       total,
       page,
       limit,
@@ -48,7 +49,7 @@ export class PrismaDocumentRepository implements IDocumentRepository {
   }
 
   async findAll(options?: FindAllOptions): Promise<Document[]> {
-    const args: any = {
+    const args: Prisma.DocumentFindManyArgs = {
       take: options?.limit ?? 100,
       skip: options?.page ? (options.page - 1) * (options.limit ?? 100) : 0,
     };
@@ -56,7 +57,7 @@ export class PrismaDocumentRepository implements IDocumentRepository {
       args.orderBy = { [options.orderBy]: options.orderDir ?? 'asc' };
     }
     const data = await prisma.document.findMany(args);
-    return data.map((d: any) => this.mapToDomain(d));
+    return data.map((d) => this.mapToDomain(d));
   }
 
   async findByContentHash(userId: string, contentHash: string): Promise<Document | null> {
@@ -68,7 +69,7 @@ export class PrismaDocumentRepository implements IDocumentRepository {
   }
 
   async save(entity: Document): Promise<Document> {
-    const data: any = {
+    const data = {
       userId: entity.userId,
       filename: entity.filename,
       mimeType: entity.mimeType,
@@ -82,17 +83,22 @@ export class PrismaDocumentRepository implements IDocumentRepository {
       embeddingDimension: entity.embeddingDimension,
       embeddingProvider: entity.embeddingProvider,
       tags: entity.tags,
-      metadata: entity.metadata ?? {},
-      pageCount: entity.pageCount,
-      wordCount: entity.wordCount,
-      language: entity.language,
-      indexedAt: entity.indexedAt,
+      metadata: entity.metadata as Prisma.InputJsonValue,
+      pageCount: entity.pageCount ?? null,
+      wordCount: entity.wordCount ?? null,
+      language: entity.language ?? null,
+      indexedAt: entity.indexedAt ?? null,
     };
 
     const saved = await prisma.document.upsert({
       where: { id: entity.id },
       update: data,
-      create: { id: entity.id, createdAt: entity.createdAt, ...data },
+      create: {
+        id: entity.id,
+        createdAt: entity.createdAt,
+        updatedAt: entity.updatedAt,
+        ...data,
+      },
     });
 
     // Clear domain events after save (in a real DDD setup, we'd dispatch them here)
@@ -111,13 +117,29 @@ export class PrismaDocumentRepository implements IDocumentRepository {
   }
 
   async updateStatus(id: string, status: DocumentStatus): Promise<void> {
+    const existing = await prisma.document.findUnique({
+      where: { id },
+      select: { status: true, userId: true },
+    });
+
     await prisma.document.update({
       where: { id },
       data: { status },
     });
+
+    if (existing && existing.status !== status) {
+      await activityLogService.record({
+        userId: existing.userId,
+        domain: 'DOCUMENT',
+        entityId: id,
+        action: 'STATUS_CHANGED',
+        message: 'document.status_changed',
+        metadata: { from: existing.status, to: status },
+      });
+    }
   }
 
-  private mapToDomain(data: any): Document {
+  private mapToDomain(data: PrismaDocument): Document {
     const props: DocumentProps = {
       userId: data.userId,
       filename: data.filename,
@@ -134,12 +156,16 @@ export class PrismaDocumentRepository implements IDocumentRepository {
       embeddingDimension: data.embeddingDimension,
       embeddingProvider: data.embeddingProvider,
       tags: data.tags,
-      metadata: typeof data.metadata === 'object' && data.metadata !== null ? data.metadata : {},
-      pageCount: data.pageCount ?? undefined,
-      wordCount: data.wordCount ?? undefined,
-      language: data.language ?? undefined,
-      indexedAt: data.indexedAt ?? undefined,
+      metadata:
+        typeof data.metadata === 'object' && data.metadata !== null && !Array.isArray(data.metadata)
+          ? (data.metadata as Record<string, unknown>)
+          : {},
     };
+
+    if (data.pageCount != null) props.pageCount = data.pageCount;
+    if (data.wordCount != null) props.wordCount = data.wordCount;
+    if (data.language != null) props.language = data.language;
+    if (data.indexedAt != null) props.indexedAt = data.indexedAt;
 
     return new Document(data.id, props, data.createdAt, data.updatedAt);
   }

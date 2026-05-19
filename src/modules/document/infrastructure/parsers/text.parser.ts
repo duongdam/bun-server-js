@@ -1,5 +1,5 @@
-import { IFileParser, ParsedDocument } from '../../domain/services/file-parser.service';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
+import type { IFileParser, ParsedDocument } from '../../domain/services/file-parser.service';
 
 export class TextParser implements IFileParser {
   async parse(buffer: Buffer, mimeType?: string): Promise<ParsedDocument> {
@@ -15,7 +15,7 @@ export class TextParser implements IFileParser {
             text: JSON.stringify(parsed, null, 2),
             metadata: { format: 'json' },
           };
-        } catch (e) {
+        } catch (_e) {
           logger.warn('Invalid JSON format, treating as raw text');
         }
       }

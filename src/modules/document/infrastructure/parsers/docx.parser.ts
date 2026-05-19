@@ -1,6 +1,6 @@
 import mammoth from 'mammoth';
-import { IFileParser, ParsedDocument } from '../../domain/services/file-parser.service';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
+import type { IFileParser, ParsedDocument } from '../../domain/services/file-parser.service';
 
 export class DocxParser implements IFileParser {
   async parse(buffer: Buffer): Promise<ParsedDocument> {

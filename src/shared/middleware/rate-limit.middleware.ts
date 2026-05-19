@@ -1,5 +1,5 @@
-import { redis } from '../infrastructure/redis/client';
 import { logger } from '../infrastructure/logger/pino.logger';
+import { redis } from '../infrastructure/redis/client';
 
 interface RateLimitOptions {
   windowMs: number; // time window in milliseconds
@@ -13,8 +13,8 @@ interface RateLimitResult {
 }
 
 const DEFAULT_OPTIONS: RateLimitOptions = {
-  windowMs: parseInt(process.env['RATE_LIMIT_WINDOW_MS'] ?? '60000', 10),
-  maxRequests: parseInt(process.env['RATE_LIMIT_MAX_REQUESTS'] ?? '100', 10),
+  windowMs: Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '60000', 10),
+  maxRequests: Number.parseInt(process.env.RATE_LIMIT_MAX_REQUESTS ?? '100', 10),
 };
 
 /**

@@ -32,9 +32,46 @@ enum SearchType {
   SEMANTIC
   HYBRID
   KEYWORD
+  RAG
+}
+
+enum UserRole {
+  ADMIN
+  USER
+  READONLY
+}
+
+enum ActivityDomain {
+  DOCUMENT
+  JOB
+  EMBEDDING
+}
+
+enum ActivityAction {
+  CREATED
+  UPDATED
+  DELETED
+  STATUS_CHANGED
+  STAGE_CHANGED
+  BATCH_COMPLETED
+  FAILED
 }
 
 // ─── Models ───────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @db.VarChar(255)
+  role         UserRole  @default(USER)
+  displayName  String?   @db.VarChar(255)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("users")
+}
 
 model Document {
   id                 String         @id @default(uuid())
@@ -128,4 +165,19 @@ model SearchHistory {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("search_history")
+}
+
+model ActivityLog {
+  id        String         @id @default(uuid())
+  userId    String
+  domain    ActivityDomain
+  entityId  String         @db.VarChar(64)
+  action    ActivityAction
+  message   String?        @db.VarChar(512)
+  metadata  Json           @default("{}")
+  createdAt DateTime       @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([domain, entityId])
+  @@map("activity_logs")
 }

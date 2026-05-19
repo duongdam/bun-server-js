@@ -1,6 +1,6 @@
 import { HfInference } from '@huggingface/inference';
-import { IEmbeddingProvider } from './embedding-provider.interface';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
+import type { IEmbeddingProvider } from './embedding-provider.interface';
 
 export class HuggingFaceEmbeddingProvider implements IEmbeddingProvider {
   public readonly provider = 'huggingface';
@@ -9,11 +9,11 @@ export class HuggingFaceEmbeddingProvider implements IEmbeddingProvider {
   private hf: HfInference;
 
   constructor() {
-    this.model = process.env['HUGGINGFACE_MODEL'] || 'sentence-transformers/all-MiniLM-L6-v2';
+    this.model = process.env.HUGGINGFACE_MODEL || 'sentence-transformers/all-MiniLM-L6-v2';
     // dimension for all-MiniLM-L6-v2 is 384
     this.dimension = this.model.includes('MiniLM') ? 384 : 768;
 
-    const apiKey = process.env['HUGGINGFACE_API_KEY'];
+    const apiKey = process.env.HUGGINGFACE_API_KEY;
     if (!apiKey) {
       throw new Error('HUGGINGFACE_API_KEY is required when using huggingface provider');
     }

@@ -1,33 +1,21 @@
-import { SearchService } from '../../domain/services/search.service';
-import { SearchRequestDto } from '../dtos/search-request.dto';
-import { SearchResponseDto } from '../dtos/search-result.dto';
-import { EmbeddingService } from '../../../embedding/domain/services/embedding.service';
-import { prisma } from '../../../../shared/infrastructure/prisma/client';
-import { SearchFilter } from '../../domain/value-objects/search-filter.vo';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
+import { prisma } from '../../../../shared/infrastructure/prisma/client';
+import type { EmbeddingService } from '../../../embedding/domain/services/embedding.service';
+import type { SearchService } from '../../domain/services/search.service';
+import { parseSearchFilters } from '../parse-search-filters';
+import type { SearchRequestDto } from '../dtos/search-request.dto';
+import type { SearchResponseDto } from '../dtos/search-result.dto';
 
 export class SemanticSearchUseCase {
   constructor(
     private readonly searchService: SearchService,
-    private readonly embeddingService: EmbeddingService
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   async execute(userId: string, request: SearchRequestDto): Promise<SearchResponseDto> {
     const startTime = Date.now();
-    
-    // Parse filters if provided
-    let searchFilters: SearchFilter[] = [];
-    if (request.filters) {
-      searchFilters = Object.entries(request.filters).map(([field, value]) => {
-        // Simple mapping, defaulting to 'eq' for MVP
-        const filter = SearchFilter.create({
-          field,
-          operator: 'eq',
-          value
-        });
-        return filter;
-      });
-    }
+
+    const searchFilters = parseSearchFilters(userId, request.filters);
 
     // Embed the query
     const embeddings = await this.embeddingService.embedBatch([request.query]);
@@ -41,7 +29,7 @@ export class SemanticSearchUseCase {
       queryVector,
       request.topK,
       request.similarityThreshold,
-      searchFilters
+      searchFilters,
     );
 
     const latencyMs = Date.now() - startTime;
@@ -56,26 +44,26 @@ export class SemanticSearchUseCase {
           topK: request.topK,
           resultCount: results.length,
           latencyMs,
-          filtersApplied: request.filters ?? {}
-        }
+          filtersApplied: request.filters ?? {},
+        },
       });
     } catch (err) {
       logger.error({ err }, 'Failed to log search history');
     }
 
     return {
-      results: results.map(r => ({
+      results: results.map((r) => ({
         chunkId: r.chunkId,
         documentId: r.documentId,
         filename: r.filename,
         content: r.content,
         pageNumber: r.pageNumber,
         chunkIndex: r.chunkIndex,
-        similarityScore: r.similarityScore
+        similarityScore: r.similarityScore,
       })),
       query: request.query,
       searchType: request.searchType,
-      latencyMs
+      latencyMs,
     };
   }
 }

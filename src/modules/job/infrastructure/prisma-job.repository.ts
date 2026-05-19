@@ -1,6 +1,9 @@
-import { AIProcessingJob, AIProcessingJobProps } from '../domain/entities/processing-job.entity';
+import { JobStatus, type AIProcessingJob as PrismaAIProcessingJob } from '@prisma/client';
 import { prisma } from '../../../shared/infrastructure/prisma/client';
-import { JobStatus } from '@prisma/client';
+import {
+  AIProcessingJob,
+  type AIProcessingJobProps,
+} from '../domain/entities/processing-job.entity';
 
 export class PrismaJobRepository {
   async findById(id: string): Promise<AIProcessingJob | null> {
@@ -10,19 +13,19 @@ export class PrismaJobRepository {
   }
 
   async save(entity: AIProcessingJob): Promise<AIProcessingJob> {
-    const data: any = {
+    const data = {
       documentId: entity.documentId,
       userId: entity.userId,
       status: entity.status,
-      stage: entity.stage,
+      stage: entity.stage ?? null,
       progress: entity.progress,
-      totalChunks: entity.totalChunks,
+      totalChunks: entity.totalChunks ?? null,
       processedChunks: entity.processedChunks,
-      errorMessage: entity.errorMessage,
+      errorMessage: entity.errorMessage ?? null,
       retryCount: entity.retryCount,
       maxRetries: entity.maxRetries,
-      startedAt: entity.startedAt,
-      completedAt: entity.completedAt,
+      startedAt: entity.startedAt ?? null,
+      completedAt: entity.completedAt ?? null,
     };
 
     const saved = await prisma.aIProcessingJob.upsert({
@@ -74,22 +77,23 @@ export class PrismaJobRepository {
     });
   }
 
-  private mapToDomain(data: any): AIProcessingJob {
+  private mapToDomain(data: PrismaAIProcessingJob): AIProcessingJob {
     const props: AIProcessingJobProps = {
       documentId: data.documentId,
       userId: data.userId,
       status: data.status,
-      stage: data.stage ?? undefined,
       progress: data.progress,
-      totalChunks: data.totalChunks ?? undefined,
       processedChunks: data.processedChunks,
-      errorMessage: data.errorMessage ?? undefined,
       retryCount: data.retryCount,
       maxRetries: data.maxRetries,
-      startedAt: data.startedAt ?? undefined,
-      completedAt: data.completedAt ?? undefined,
     };
 
-    return new AIProcessingJob(data.id, props, data.createdAt, data.updatedAt);
+    if (data.stage != null) props.stage = data.stage;
+    if (data.totalChunks != null) props.totalChunks = data.totalChunks;
+    if (data.errorMessage != null) props.errorMessage = data.errorMessage;
+    if (data.startedAt != null) props.startedAt = data.startedAt;
+    if (data.completedAt != null) props.completedAt = data.completedAt;
+
+    return new AIProcessingJob(data.id, props, data.createdAt, data.createdAt);
   }
 }

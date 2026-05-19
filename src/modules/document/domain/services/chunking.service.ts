@@ -1,5 +1,5 @@
 import { encode } from 'gpt-tokenizer';
-import { ChunkingConfig } from '../value-objects/chunking-config.vo';
+import type { ChunkingConfig } from '../value-objects/chunking-config.vo';
 
 export interface Chunk {
   content: string;
@@ -21,7 +21,6 @@ export class ChunkingService {
         return this.tokenAwareChunking(text, config, metadata);
       case 'semantic':
         return this.semanticChunking(text, config, metadata);
-      case 'recursive':
       default:
         return this.recursiveTextChunking(text, config, metadata);
     }

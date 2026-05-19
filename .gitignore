@@ -8,10 +8,9 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment
+# Environment (never commit secrets; keep .env.example as template only)
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
 
 # Logs
