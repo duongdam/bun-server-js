@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# Dev files
+.git/
+.gitignore
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+*.md
+!README.md
+
+# Environment
+.env*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Test
+tests/
+coverage/
+*.test.ts
+*.spec.ts
+
+# Dev tools
+.vscode/
+.idea/
+biome.json
+.eslintrc*
+.prettierrc*
+
+# Specs and docs (not needed in container)
+specs/
+docs/
+.specify/
+.agents/

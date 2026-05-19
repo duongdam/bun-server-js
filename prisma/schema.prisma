@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────
+
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  INDEXED
+  FAILED
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+enum SearchType {
+  SEMANTIC
+  HYBRID
+  KEYWORD
+}
+
+// ─── Models ───────────────────────────────────────────────
+
+model Document {
+  id                 String         @id @default(uuid())
+  userId             String
+  filename           String         @db.VarChar(512)
+  mimeType           String         @db.VarChar(128)
+  fileSize           BigInt
+  status             DocumentStatus @default(PENDING)
+  pageCount          Int?
+  wordCount          Int?
+  language           String?        @db.VarChar(32)
+  tags               String[]       @default([])
+  metadata           Json           @default("{}")
+  contentHash        String         @db.VarChar(64)
+  chunkingStrategy   String         @default("recursive") @db.VarChar(64)
+  chunkSize          Int            @default(512)
+  chunkOverlap       Int            @default(50)
+  embeddingModel     String         @db.VarChar(128)
+  embeddingDimension Int
+  embeddingProvider  String         @default("openai") @db.VarChar(64)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  indexedAt          DateTime?
+
+  // Relations
+  chunks DocumentChunk[]
+  jobs   AIProcessingJob[]
+
+  @@unique([userId, contentHash])
+  @@index([userId, status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id         String   @id @default(uuid())
+  documentId String
+  chunkIndex Int
+  content    String
+  pageNumber Int?
+  startChar  Int?
+  endChar    Int?
+  tokenCount Int
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // NOTE: embedding relation and contentTsv tsvector column are managed
+  // via raw SQL in migration (pgvector vector type not natively supported by Prisma)
+
+  @@index([documentId, chunkIndex])
+  @@map("document_chunks")
+}
+
+model AIProcessingJob {
+  id              String    @id @default(uuid())
+  documentId      String
+  userId          String
+  status          JobStatus @default(PENDING)
+  stage           String?   @db.VarChar(64)
+  progress        Int       @default(0)
+  totalChunks     Int?
+  processedChunks Int       @default(0)
+  errorMessage    String?
+  retryCount      Int       @default(0)
+  maxRetries      Int       @default(3)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([userId, status])
+  @@map("ai_processing_jobs")
+}
+
+model SearchHistory {
+  id             String     @id @default(uuid())
+  userId         String
+  query          String
+  searchType     SearchType
+  topK           Int
+  resultCount    Int
+  latencyMs      Int
+  filtersApplied Json       @default("{}")
+  createdAt      DateTime   @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("search_history")
+}

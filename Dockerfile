@@ -1,33 +1,57 @@
-FROM oven/bun:latest as build-stage
-
-WORKDIR /dist
-
-COPY . .
-COPY .env.production .env
-COPY package.json package.json
-COPY bun.lockb bun.lockb
-
-# Firebase staging
-#COPY firebase/stg.json stg.json
-# Firebase Production
-#COPY firebase/prod.json prod.json
-
-RUN bun install
-RUN bun build ./server.js --outfile server --compile
-
-# Reduce image size
-# FROM  --platform=linux/amd64 oven/bun:latest if error occurs with platform, but in v1.0.0 it should be fixed
-FROM oven/bun:latest
+# ─── Stage 1: Dependencies ────────────────────────────────
+FROM oven/bun:1.3.14-alpine AS deps
 
 WORKDIR /app
 
-COPY --from=build-stage /dist/.env ./.env
-#COPY --from=build-stage /dist/stg.json ./firebase/stg.json
-COPY --from=build-stage /dist/server ./server
+# Copy package files
+COPY package.json bun.lockb* ./
 
-EXPOSE 8080
-ENV PORT 8080
-# set hostname to localhost - Use when deploying to Google Cloud Run
-ENV HOSTNAME "0.0.0.0"
+# Install production dependencies only
+RUN bun install --frozen-lockfile --production
 
-CMD ["./server"]
+# ─── Stage 2: Builder ─────────────────────────────────────
+FROM oven/bun:1.3.14-alpine AS builder
+
+WORKDIR /app
+
+# Copy all dependencies (including dev for build)
+COPY package.json bun.lockb* ./
+RUN bun install --frozen-lockfile
+
+# Copy source
+COPY . .
+
+# Generate Prisma client
+RUN bunx prisma generate
+
+# Build the application
+RUN bun build src/app.ts --outdir dist --target bun --minify
+
+# ─── Stage 3: Production ──────────────────────────────────
+FROM oven/bun:1.3.14-alpine AS production
+
+WORKDIR /app
+
+# Security: run as non-root
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S appuser -u 1001 -G nodejs
+
+# Copy production deps
+COPY --from=deps --chown=appuser:nodejs /app/node_modules ./node_modules
+
+# Copy built assets and Prisma client
+COPY --from=builder --chown=appuser:nodejs /app/dist ./dist
+COPY --from=builder --chown=appuser:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=appuser:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=appuser:nodejs /app/package.json ./
+
+USER appuser
+
+EXPOSE 3000
+
+ENV NODE_ENV=production
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD wget -qO- http://localhost:3000/health || exit 1
+
+CMD ["bun", "dist/app.js"]
