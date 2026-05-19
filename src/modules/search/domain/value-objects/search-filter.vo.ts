@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const SearchFilterSchema = z.object({
   field: z.string(),
   operator: z.enum(['eq', 'in', 'gte', 'lte', 'contains']),
-  value: z.any(),
+  value: z.unknown(),
 });
 
 export type SearchFilterProps = z.infer<typeof SearchFilterSchema>;
@@ -11,7 +11,7 @@ export type SearchFilterProps = z.infer<typeof SearchFilterSchema>;
 export class SearchFilter {
   public readonly field: string;
   public readonly operator: SearchFilterProps['operator'];
-  public readonly value: any;
+  public readonly value: unknown;
 
   private constructor(props: SearchFilterProps) {
     this.field = props.field;

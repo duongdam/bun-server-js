@@ -1,18 +1,22 @@
-import { SearchService } from '../../domain/services/search.service';
-import { RetrievalRequestDto } from '../dtos/retrieval-request.dto';
-import { RetrievalResponseDto } from '../dtos/retrieval-response.dto';
-import { EmbeddingService } from '../../../embedding/domain/services/embedding.service';
+import { logger } from '@/shared/infrastructure/logger/pino.logger';
+import { prisma } from '@/shared/infrastructure/prisma/client';
+import { SearchType } from '@prisma/client';
+
+import type { EmbeddingService } from '../../../embedding/domain/services/embedding.service';
+import type { SearchService } from '../../domain/services/search.service';
 import { SearchFilter } from '../../domain/value-objects/search-filter.vo';
+import type { RetrievalRequestDto } from '../dtos/retrieval-request.dto';
+import type { RetrievalResponseDto } from '../dtos/retrieval-response.dto';
 
 export class RagRetrievalUseCase {
   constructor(
     private readonly searchService: SearchService,
-    private readonly embeddingService: EmbeddingService
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   async execute(userId: string, request: RetrievalRequestDto): Promise<RetrievalResponseDto> {
     const startTime = Date.now();
-    
+
     // Parse filters
     let searchFilters: SearchFilter[] = [];
     if (request.filters) {
@@ -36,7 +40,7 @@ export class RagRetrievalUseCase {
       queryVector,
       request.topK * 2,
       request.similarityThreshold,
-      searchFilters
+      searchFilters,
     );
 
     let currentTokens = 0;
@@ -46,14 +50,14 @@ export class RagRetrievalUseCase {
     for (const result of results) {
       if (currentTokens + result.tokenCount > request.maxTokens) {
         // Stop packing if this chunk exceeds the maxTokens budget
-        // We could selectively pack smaller chunks, but greedy sequential packing 
+        // We could selectively pack smaller chunks, but greedy sequential packing
         // preserves the most relevant chunks first since results are ranked.
         continue;
       }
 
       currentTokens += result.tokenCount;
       sourceIds.add(result.documentId);
-      
+
       context.push({
         text: result.content,
         score: result.similarityScore ?? 0,
@@ -61,8 +65,8 @@ export class RagRetrievalUseCase {
           documentId: result.documentId,
           filename: result.filename,
           pageNumber: result.pageNumber,
-          chunkIndex: result.chunkIndex
-        }
+          chunkIndex: result.chunkIndex,
+        },
       });
 
       if (context.length >= request.topK) {
@@ -72,12 +76,29 @@ export class RagRetrievalUseCase {
 
     const latencyMs = Date.now() - startTime;
 
+    // Log to SearchHistory
+    try {
+      await prisma.searchHistory.create({
+        data: {
+          userId,
+          query: request.query,
+          searchType: SearchType.RAG,
+          topK: request.topK,
+          resultCount: results.length,
+          latencyMs,
+          filtersApplied: request.filters ?? {},
+        },
+      });
+    } catch (err: unknown) {
+      logger.error({ err }, 'Failed to log search history');
+    }
+
     return {
       context,
       totalTokens: currentTokens,
       sources: Array.from(sourceIds),
       query: request.query,
-      latencyMs
+      latencyMs,
     };
   }
 }

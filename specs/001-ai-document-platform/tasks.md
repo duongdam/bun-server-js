@@ -62,7 +62,9 @@ description: "Task list for AI Document Platform implementation"
 
 **Goal**: A user uploads any supported file format. The platform parses it, chunks the text, generates embeddings, and stores vectors — making the document fully searchable.
 
-**Independent Test**: Upload `sample.pdf` via `POST /api/v1/documents/upload`, poll `GET /api/v1/jobs/:id` until `status: "completed"`, then verify the document appears in `GET /api/v1/documents` with `status: "indexed"` and that rows exist in `document_chunks` and `emb- [x] T021 [P] [US1] Create `src/modules/document/domain/value-objects/file-type.vo.ts` — `FileType` value object validating extension + MIME type against allowed list (pdf, docx, txt, md, csv, json, html)
+**Independent Test**: Upload `sample.pdf` via `POST /api/v1/documents/upload`, poll `GET /api/v1/jobs/:id` until `status: "completed"`, then verify the document appears in `GET /api/v1/documents` with `status: "indexed"` and that rows exist in `document_chunks` and embeddings.
+
+- [x] T021 [P] [US1] Create `src/modules/document/domain/value-objects/file-type.vo.ts` — `FileType` value object validating extension + MIME type against allowed list (pdf, docx, txt, md, csv, json, html)
 - [x] T022 [P] [US1] Create `src/modules/document/domain/value-objects/chunking-config.vo.ts` — `ChunkingConfig` value object with `strategy` (recursive|semantic|token), `chunkSize` (64–2048), `chunkOverlap` (< chunkSize)
 - [x] T023 [P] [US1] Create `src/modules/document/domain/entities/document.entity.ts` — `Document` domain entity extending `BaseEntity`; fields per `data-model.md`; state machine methods: `markProcessing()`, `markIndexed()`, `markFailed(error)`; `domainEvents` array
 - [x] T024 [P] [US1] Create `src/modules/document/domain/events/document-uploaded.event.ts` — `DocumentUploadedEvent` domain event carrying `documentId`, `filename`, `mimeType`, `userId`
@@ -213,16 +215,112 @@ description: "Task list for AI Document Platform implementation"
 
 **Purpose**: Improvements that span all modules and harden the system for production.
 
-- [ ] T071 [P] Add `GET /health` endpoint in `src/app.ts` — check DB connectivity (`prisma.$queryRaw('SELECT 1')`), Redis ping, embedding provider availability; return JSON status per API contract
-- [ ] T072 [P] Add ADR documents in `docs/adr/`: `001-elysia-framework.md`, `002-pgvector-hnsw.md`, `003-bullmq-queue.md`, `004-chunking-strategies.md`
-- [ ] T073 [P] Add OpenAPI export script: `bun run build:docs` → write `docs/openapi.json` from Elysia Swagger plugin
-- [ ] T074 Add file size validation (reject > 100MB) and content-type validation in `upload-document.use-case.ts` (guard against MIME spoofing)
-- [ ] T075 Add duplicate document detection in `upload-document.use-case.ts` — return `409 Conflict` with `existingDocumentId` if SHA-256 hash already exists for the same user
-- [ ] T076 [P] Add `SearchHistory` writes to all search use cases (T055, T056, T057, T063) — log `query`, `searchType`, `topK`, `resultCount`, `latencyMs`, `filtersApplied`
-- [ ] T077 [P] Configure BullMQ concurrency (4 workers) and exponential backoff retry strategy (3 retries: 1s → 5s → 30s) in `src/modules/job/infrastructure/document-processing.worker.ts`
-- [ ] T078 [P] Add Pino request logging middleware to `src/app.ts` — log `method`, `path`, `statusCode`, `latencyMs`, `userId` per request
-- [ ] T079 Validate all environment variables at startup in `src/app.ts` using Zod — throw on missing required vars before server starts
-- [ ] T080 [P] Update `README.md` — project overview, architecture diagram link, quick-start steps, API endpoint summary, environment variable table, Docker instructions
+- [x] T071 [P] Add `GET /health` endpoint in `src/app.ts` — check DB connectivity (`prisma.$queryRaw('SELECT 1')`), Redis ping, embedding provider availability; return JSON status per API contract
+- [x] T072 [P] Add ADR documents in `docs/adr/`: `001-elysia-framework.md`, `002-pgvector-hnsw.md`, `003-bullmq-queue.md`, `004-chunking-strategies.md`
+- [x] T073 [P] Add OpenAPI export script: `bun run build:docs` → write `docs/openapi.json` from Elysia Swagger plugin
+- [x] T074 Add file size validation (reject > 100MB) and content-type validation in `upload-document.use-case.ts` (guard against MIME spoofing)
+- [x] T075 Add duplicate document detection in `upload-document.use-case.ts` — return `409 Conflict` with `existingDocumentId` if SHA-256 hash already exists for the same user
+- [x] T076 [P] Add `SearchHistory` writes to all search use cases (T055, T056, T057, T063) — log `query`, `searchType`, `topK`, `resultCount`, `latencyMs`, `filtersApplied`
+- [x] T077 [P] Configure BullMQ concurrency (4 workers) and exponential backoff retry strategy (3 retries: 1s → 5s → 30s) in `src/modules/job/infrastructure/document-processing.worker.ts`
+- [x] T078 [P] Add Pino request logging middleware to `src/app.ts` — log `method`, `path`, `statusCode`, `latencyMs`, `userId` per request
+- [x] T079 Validate all environment variables at startup in `src/app.ts` using Zod — throw on missing required vars before server starts
+- [x] T080 [P] Update `README.md` — project overview, architecture diagram link, quick-start steps, API endpoint summary, environment variable table, Docker instructions
+
+---
+
+## Phase 8: User Story 5 — Authentication (Login with Account/Password) (Priority: P1)
+
+**Goal**: Users register and sign in with email + password. The API issues a signed JWT used by all protected routes (replacing the development mock user in `derive-auth-user.ts`).
+
+**Independent Test**: `POST /api/v1/auth/register` with email/password → `201`; `POST /api/v1/auth/login` → `200` with `accessToken`; call `GET /api/v1/documents` with `Authorization: Bearer <token>` → `200`; call without token → `401`; wrong password → `401`.
+
+**Context**: Extends FR-014 (JWT on all endpoints). Adds credential-based identity; `User` entity referenced in `data-model.md` but not yet implemented in Prisma.
+
+### Schema & Shared
+
+- [x] T081 [US5] Add `User` model and `UserRole` enum to `prisma/schema.prisma` — fields: `id`, `email` (unique), `passwordHash`, `role` (`admin`|`user`|`readonly`), `displayName?`, `isActive`, `lastLoginAt?`, `createdAt`, `updatedAt`; run migration
+- [x] T082 [P] [US5] Update `prisma/seed.ts` — create default admin user with hashed password from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` env vars
+- [x] T083 [P] [US5] Extend `src/shared/config/env.ts` — add optional `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `BCRYPT_COST` (default 10); document in `.env.example`
+
+### Domain Layer — Auth Module
+
+- [x] T084 [P] [US5] Create `src/modules/auth/domain/entities/user.entity.ts` — `User` entity with `email`, `role`, `isActive`; factory `create()`; no password hash on entity surface
+- [x] T085 [P] [US5] Create `src/modules/auth/domain/repositories/user.repository.interface.ts` — `findByEmail`, `findById`, `save`, `updateLastLogin`
+- [x] T086 [US5] Create `src/modules/auth/domain/services/password.service.ts` — `hashPassword(plain)` and `verifyPassword(plain, hash)` using `Bun.password` (argon2id) or bcrypt; constant-time compare
+
+### Infrastructure
+
+- [x] T087 [US5] Create `src/modules/auth/infrastructure/prisma-user.repository.ts` — `PrismaUserRepository` implementing `IUserRepository`; map Prisma `User` ↔ domain entity
+
+### Application Layer
+
+- [x] T088 [P] [US5] Create `src/modules/auth/application/dtos/login.dto.ts` — Zod: `email`, `password` (min 8)
+- [x] T089 [P] [US5] Create `src/modules/auth/application/dtos/register.dto.ts` — Zod: `email`, `password`, `displayName?`, `role?` (default `user`)
+- [x] T090 [P] [US5] Create `src/modules/auth/application/dtos/auth-response.dto.ts` — `{ accessToken, expiresIn, user: { id, email, role } }`
+- [x] T091 [US5] Create `src/modules/auth/application/use-cases/register.use-case.ts` — reject duplicate email (`409`), hash password, persist user, return JWT via shared signer
+- [x] T092 [US5] Create `src/modules/auth/application/use-cases/login.use-case.ts` — validate credentials, check `isActive`, update `lastLoginAt`, return JWT (`sub`, `role`, `email` claims)
+- [x] T093 [P] [US5] Create `src/modules/auth/application/use-cases/get-current-user.use-case.ts` — resolve user from JWT `sub`
+
+### Presentation & Integration
+
+- [x] T094 [US5] Create `src/modules/auth/presentation/auth.controller.ts` — handlers: `register`, `login`, `me` (GET current user)
+- [x] T095 [US5] Create `src/modules/auth/presentation/auth.routes.ts` — `POST /auth/register`, `POST /auth/login`, `GET /auth/me` (protected); **no auth** on register/login
+- [x] T096 [US5] Wire `authRoutes` into `src/app.ts` under `/api/v1`; ensure JWT plugin signs tokens with same secret/claims as login use case
+- [x] T097 [US5] Update `src/shared/middleware/derive-auth-user.ts` — remove hardcoded dev mock user; allow opt-in dev bypass only when `NODE_ENV=development` **and** `AUTH_DEV_BYPASS=true`
+- [x] T098 [US5] Update `specs/001-ai-document-platform/contracts/api.md` — document auth endpoints, request/response shapes, error codes (`401`, `409`)
+
+**Checkpoint**: Real login flow works end-to-end; protected document/search/job routes accept JWT from login.
+
+---
+
+## Phase 9: User Story 6 — Activity Logs (Document, Job, Embedding) (Priority: P2)
+
+**Goal**: Persist an append-only audit trail for document, job, and embedding lifecycle events. Operators can query logs filtered by domain, entity, user, and time range.
+
+**Independent Test**: Upload a document (US1) → query `GET /api/v1/activity-logs?domain=document&entityId=<docId>` and see `document.uploaded`; poll job to completion → see `job.started`, `job.stage_changed`, `job.completed`; verify `embedding.batch_completed` after worker finishes; unauthorized user cannot read another user's logs.
+
+### Schema & Domain
+
+- [x] T099 [US6] Add `ActivityLog` model and enums to `prisma/schema.prisma` — `ActivityDomain` (`DOCUMENT`|`JOB`|`EMBEDDING`), `ActivityAction` (e.g. `CREATED`|`UPDATED`|`DELETED`|`STATUS_CHANGED`|`STAGE_CHANGED`|`BATCH_COMPLETED`|`FAILED`); fields: `id`, `userId`, `domain`, `entityId`, `action`, `message?`, `metadata` JSON, `createdAt`; indexes on `(userId, createdAt)`, `(domain, entityId)`; run migration
+- [x] T100 [P] [US6] Create `src/modules/activity-log/domain/entities/activity-log.entity.ts` — immutable log entry entity
+- [x] T101 [P] [US6] Create `src/modules/activity-log/domain/repositories/activity-log.repository.interface.ts` — `append`, `findByFilters` (paginated)
+- [x] T102 [US6] Create `src/modules/activity-log/domain/services/activity-log.service.ts` — `record(params)` helper; never throws (swallow/log errors so main flow is not blocked)
+
+### Infrastructure & Application
+
+- [x] T103 [US6] Create `src/modules/activity-log/infrastructure/prisma-activity-log.repository.ts` — `PrismaActivityLogRepository`
+- [x] T104 [P] [US6] Create `src/modules/activity-log/application/dtos/activity-log-response.dto.ts` — API response mapping
+- [x] T105 [US6] Create `src/modules/activity-log/application/queries/list-activity-logs.query.ts` — filters: `domain`, `entityId`, `action`, `from`, `to`, `page`, `limit`; scope to authenticated `userId`
+
+### Emitters — Wire Into Existing Modules
+
+- [x] T106 [P] [US6] Instrument `src/modules/document/application/use-cases/upload-document.use-case.ts` — log `document.uploaded`
+- [x] T107 [P] [US6] Instrument `src/modules/document/application/use-cases/delete-document.use-case.ts` — log `document.deleted`
+- [x] T108 [P] [US6] Instrument `src/modules/document/application/use-cases/reindex-document.use-case.ts` — log `document.reindex_requested`
+- [x] T109 [US6] Instrument `src/modules/job/infrastructure/document-processing.worker.ts` — log `job.started`, `job.stage_changed` (parsing/chunking/embedding/storing), `job.completed`, `job.failed`
+- [x] T110 [US6] Instrument `src/modules/embedding/domain/services/embedding.service.ts` (or worker embedding step) — log `embedding.batch_completed` with `{ chunkCount, model, provider, durationMs }`
+- [x] T111 [P] [US6] Instrument `src/modules/document/infrastructure/prisma-document.repository.ts` `updateStatus` — log `document.status_changed` with `{ from, to }` in metadata
+
+### Presentation
+
+- [x] T112 [US6] Create `src/modules/activity-log/presentation/activity-log.controller.ts` — `GET /activity-logs` (list, paginated)
+- [x] T113 [US6] Create `src/modules/activity-log/presentation/activity-log.routes.ts` — register under `/activity-logs`; require auth
+- [x] T114 [US6] Wire `activityLogRoutes` into `src/app.ts`
+- [x] T115 [US6] Update `specs/001-ai-document-platform/contracts/api.md` — document activity log list endpoint, query params, response schema
+
+**Checkpoint**: Full document pipeline produces correlated activity log entries queryable by domain and entity ID.
+
+---
+
+## Phase 10: Polish — Auth & Activity Log Integration
+
+**Purpose**: Cross-cutting hardening for US5 and US6.
+
+- [ ] T116 [P] Add rate limiting on `POST /auth/login` and `POST /auth/register` in `src/modules/auth/presentation/auth.routes.ts` (stricter than global: e.g. 10 req/min per IP)
+- [ ] T117 [P] Add retention policy note + optional `ACTIVITY_LOG_RETENTION_DAYS` env in `.env.example`; document cleanup strategy in `README.md`
+- [ ] T118 Update `specs/001-ai-document-platform/data-model.md` — add `User` and `ActivityLog` entity tables
+- [ ] T119 [P] Update `specs/001-ai-document-platform/quickstart.md` — register/login curl examples, sample activity log query
+- [ ] T120 Run `bunx tsc --noEmit` and `bun run lint` after US5+US6 implementation
 
 ---
 
@@ -237,6 +335,9 @@ description: "Task list for AI Document Platform implementation"
 - **US3 (Phase 5)**: Depends on US2 being complete (uses `SearchService`)
 - **US4 (Phase 6)**: Depends on Phase 2 only — can run in parallel with US2/US3
 - **Polish (Phase 7)**: Depends on all user stories complete
+- **US5 (Phase 8)**: Depends on Phase 2 — **should complete before production**; replaces dev JWT mock
+- **US6 (Phase 9)**: Depends on US1 (document/job/embedding flows exist to instrument)
+- **Polish Auth/Logs (Phase 10)**: Depends on US5 + US6
 
 ### User Story Dependencies
 
@@ -244,6 +345,8 @@ description: "Task list for AI Document Platform implementation"
 - **US2 (P1)**: Depends on `EmbeddingService` (T035) and `PgVectorSearchRepository`. Can start in parallel with US1 after T035 and T052 unblock.
 - **US3 (P2)**: Depends on US2 search infrastructure being complete.
 - **US4 (P3)**: Depends on Phase 2 only. Can run fully in parallel with US2 and US3.
+- **US5 (P1)**: Depends on Phase 2. Independent of US2–US4; unblocks real JWT for all routes.
+- **US6 (P2)**: Depends on US1 pipeline (and benefits from US5 for user-scoped queries). Can start schema (T099–T103) in parallel with US5.
 
 ### Within Each User Story
 
@@ -301,6 +404,9 @@ Task: "Create document.entity.ts" (T023)
 4. Add US3 → **Test independently** → RAG retrieval endpoint ✅
 5. Add US4 → **Test independently** → Full document management ✅
 6. Polish → Production hardening ✅
+7. Add US5 → **Test independently** → Register/login + JWT on protected routes
+8. Add US6 → **Test independently** → Activity logs for document, job, embedding events
+9. Phase 10 → Rate limits, docs, validation
 
 ### Parallel Team Strategy
 
@@ -309,13 +415,40 @@ With 3+ developers (after Phase 2 complete):
 - **Dev B**: US2 (vector search, hybrid search infrastructure)
 - **Dev C**: US4 (document management CRUD — independent of US2/US3)
 - US3 assigned to first dev who completes their story
+- **After core platform**: Dev A → US5 (auth), Dev B → US6 schema + emitters in parallel
+
+### Parallel Example: User Story 5 (Auth)
+
+```bash
+# After T081 migration, launch in parallel:
+Task: "Create user.entity.ts" (T084)
+Task: "Create user.repository.interface.ts" (T085)
+Task: "Create login.dto.ts" (T088)
+Task: "Create register.dto.ts" (T089)
+Task: "Create auth-response.dto.ts" (T090)
+# Then sequentially: T086 → T087 → T091/T092 → T094–T097
+```
+
+### Parallel Example: User Story 6 (Activity Logs)
+
+```bash
+# After T099 migration, launch in parallel:
+Task: "Create activity-log.entity.ts" (T100)
+Task: "Create activity-log.repository.interface.ts" (T101)
+Task: "Create activity-log-response.dto.ts" (T104)
+Task: "Instrument upload-document.use-case.ts" (T106)
+Task: "Instrument delete-document.use-case.ts" (T107)
+Task: "Instrument reindex-document.use-case.ts" (T108)
+# Then: T102 → T103 → T105 → worker/embedding instrumentation → T112–T115
+```
 
 ---
 
 ## Notes
 
 - `[P]` tasks = different files, no inter-task dependencies within the same phase
-- `[US1]–[US4]` maps each task to its user story for delivery traceability
+- `[US1]–[US6]` maps each task to its user story for delivery traceability
+- **US5+US6** (T081–T120): 40 new tasks; Phases 1–7 (T001–T080) remain complete
 - Embedding dimension is configurable per document — schema uses `vector(1536)` as default; different model dimensions require a new migration
 - pgvector raw SQL is required for `INSERT ... ::vector` and `ORDER BY ... <=>` — use `$executeRaw` / `$queryRaw` in Prisma
 - Commit after each logical group or checkpoint to maintain clean git history

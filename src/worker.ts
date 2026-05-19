@@ -1,8 +1,9 @@
-import { Worker, type Job } from 'bullmq';
+import { type Job, Worker } from 'bullmq';
 import { z } from 'zod';
+import { maskSecret, parseServerEnv } from './shared/config/env';
 import { logger } from './shared/infrastructure/logger/pino.logger';
 import { connectDatabase, disconnectDatabase } from './shared/infrastructure/prisma/client';
-import { redis, disconnectRedis } from './shared/infrastructure/redis/client';
+import { disconnectRedis, redis } from './shared/infrastructure/redis/client';
 
 // ─── Environment Validation ───────────────────────────────
 const envSchema = z.object({
@@ -11,7 +12,7 @@ const envSchema = z.object({
 });
 
 const env = envSchema.parse(process.env);
-const CONCURRENCY = parseInt(env.WORKER_CONCURRENCY, 10);
+const CONCURRENCY = Number.parseInt(env.WORKER_CONCURRENCY, 10);
 
 // ─── Queue Name Constants ─────────────────────────────────
 export const DOCUMENT_PROCESSING_QUEUE = 'document-processing';
@@ -86,7 +87,20 @@ async function shutdown(worker: Worker, signal: string) {
 }
 
 // ─── Bootstrap ────────────────────────────────────────────
-const worker = await createWorker();
+if (import.meta.main) {
+  const envResult = parseServerEnv();
+  if (envResult.success) {
+    logger.info(
+      {
+        embeddingProvider: envResult.data.EMBEDDING_PROVIDER,
+        embeddingModel: envResult.data.EMBEDDING_MODEL,
+        openaiApiKey: maskSecret(envResult.data.OPENAI_API_KEY),
+      },
+      'Worker embedding env (OPENAI_API_KEY masked)',
+    );
+  }
 
-process.on('SIGTERM', () => shutdown(worker, 'SIGTERM'));
-process.on('SIGINT', () => shutdown(worker, 'SIGINT'));
+  const worker = await createWorker();
+  process.on('SIGTERM', () => shutdown(worker, 'SIGTERM'));
+  process.on('SIGINT', () => shutdown(worker, 'SIGINT'));
+}

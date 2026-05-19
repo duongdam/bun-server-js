@@ -1,26 +1,20 @@
-import { Elysia } from 'elysia';
-import { swagger } from '@elysiajs/swagger';
-import { jwt } from '@elysiajs/jwt';
 import { cors } from '@elysiajs/cors';
-import { z } from 'zod';
+import { jwt } from '@elysiajs/jwt';
+import { swagger } from '@elysiajs/swagger';
+import { Elysia } from 'elysia';
+import { activityLogRoutes } from './modules/activity-log/presentation/activity-log.routes';
+import { authRoutes } from './modules/auth/presentation/auth.routes';
+import { documentRoutes } from './modules/document/presentation/document.routes';
+import { jobRoutes } from './modules/job/presentation/job.routes';
+import { searchRoutes } from './modules/search/presentation/search.routes';
+import { maskSecret, parseServerEnv } from './shared/config/env';
 import { logger } from './shared/infrastructure/logger/pino.logger';
 import { connectDatabase, disconnectDatabase } from './shared/infrastructure/prisma/client';
 import { disconnectRedis, pingRedis } from './shared/infrastructure/redis/client';
 import { errorHandler } from './shared/middleware/error-handler.middleware';
-import { documentRoutes } from './modules/document/presentation/document.routes';
-import { jobRoutes } from './modules/job/presentation/job.routes';
-import { searchRoutes } from './modules/search/presentation/search.routes';
 
 // ─── Environment Validation ───────────────────────────────
-const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.string().default('3000'),
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
-  DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
-  REDIS_URL: z.string().url('REDIS_URL must be a valid URL'),
-});
-
-const env = envSchema.safeParse(process.env);
+const env = parseServerEnv();
 if (!env.success) {
   logger.fatal({ errors: env.error.flatten() }, 'Invalid environment configuration');
   process.exit(1);
@@ -28,7 +22,7 @@ if (!env.success) {
 
 const envConfig = env.data;
 
-const PORT = parseInt(envConfig.PORT, 10);
+const PORT = Number.parseInt(envConfig.PORT, 10);
 
 // ─── Application Bootstrap ────────────────────────────────
 export const app = new Elysia()
@@ -45,6 +39,8 @@ export const app = new Elysia()
           contact: { name: 'API Support', email: 'support@example.com' },
         },
         tags: [
+          { name: 'auth', description: 'Authentication (register, login)' },
+          { name: 'activity-logs', description: 'Audit trail for documents, jobs, embeddings' },
           { name: 'documents', description: 'Document upload and management' },
           { name: 'search', description: 'Semantic and hybrid search' },
           { name: 'retrieval', description: 'RAG retrieval endpoints' },
@@ -64,17 +60,17 @@ export const app = new Elysia()
     jwt({
       name: 'jwt',
       secret: envConfig.JWT_SECRET,
-      exp: process.env['JWT_EXPIRES_IN'] ?? '7d',
+      exp: envConfig.JWT_EXPIRES_IN,
     }),
   )
   // CORS
   .use(
     cors({
-      origin: process.env['NODE_ENV'] === 'production' ? (process.env['ALLOWED_ORIGINS'] ?? true) : true,
+      origin: envConfig.NODE_ENV === 'production' ? (envConfig.ALLOWED_ORIGINS ?? true) : true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
       credentials: true,
-    } as any),
+    }),
   )
   // Request logging
   .onRequest(({ request }) => {
@@ -88,7 +84,7 @@ export const app = new Elysia()
     );
   })
   // Global error handler
-  .onError(errorHandler as any)
+  .onError(errorHandler)
   // Health check endpoint (no auth required)
   .get(
     '/health',
@@ -109,11 +105,11 @@ export const app = new Elysia()
       const status = dbOk && redisOk ? 'ok' : 'degraded';
       return {
         status,
-        version: process.env['npm_package_version'] ?? '1.0.0',
+        version: envConfig.NPM_PACKAGE_VERSION ?? '1.0.0',
         services: {
           database: dbOk ? 'ok' : 'error',
           redis: redisOk ? 'ok' : 'error',
-          embeddingProvider: process.env['EMBEDDING_PROVIDER'] ?? 'openai',
+          embeddingProvider: envConfig.EMBEDDING_PROVIDER,
         },
         timestamp: new Date().toISOString(),
       };
@@ -123,12 +119,23 @@ export const app = new Elysia()
     },
   )
   // Mount module routes
-  .group('/api/v1', (api) => api.use(documentRoutes).use(jobRoutes).use(searchRoutes));
+  .group('/api/v1', (api) =>
+    api.use(authRoutes).use(activityLogRoutes).use(documentRoutes).use(jobRoutes).use(searchRoutes),
+  );
 
 // ─── Server Lifecycle ─────────────────────────────────────
 
 async function start() {
   try {
+    logger.info(
+      {
+        embeddingProvider: envConfig.EMBEDDING_PROVIDER,
+        embeddingModel: envConfig.EMBEDDING_MODEL,
+        openaiApiKey: maskSecret(envConfig.OPENAI_API_KEY),
+      },
+      'Embedding env (OPENAI_API_KEY masked)',
+    );
+
     await connectDatabase();
     app.listen(PORT, () => {
       logger.info(
@@ -162,4 +169,6 @@ async function shutdown(signal: string) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-start();
+if (import.meta.main) {
+  start();
+}

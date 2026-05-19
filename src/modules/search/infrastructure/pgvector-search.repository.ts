@@ -1,29 +1,93 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../../shared/infrastructure/prisma/client';
-import { ISearchRepository, SearchResultItem } from '../domain/repositories/search.repository.interface';
-import { SearchFilter } from '../domain/value-objects/search-filter.vo';
+import type {
+  ISearchRepository,
+  SearchResultItem,
+} from '../domain/repositories/search.repository.interface';
+import type { SearchFilter } from '../domain/value-objects/search-filter.vo';
+
+interface SemanticSearchRow {
+  chunkId: string;
+  documentId: string;
+  filename: string;
+  content: string;
+  pageNumber: number | null;
+  chunkIndex: number;
+  tokenCount: number;
+  similarityScore: number | string;
+}
+
+interface KeywordSearchRow {
+  chunkId: string;
+  documentId: string;
+  filename: string;
+  content: string;
+  pageNumber: number | null;
+  chunkIndex: number;
+  tokenCount: number;
+  rankScore: number | string;
+}
+
+interface HybridSearchRow extends SemanticSearchRow {
+  rankScore: number | string | null;
+}
+
+function toSearchResult(
+  row: SemanticSearchRow | KeywordSearchRow | HybridSearchRow,
+  scores: Pick<SearchResultItem, 'similarityScore' | 'rankScore'>,
+): SearchResultItem {
+  const item: SearchResultItem = {
+    chunkId: row.chunkId,
+    documentId: row.documentId,
+    filename: row.filename,
+    content: row.content,
+    chunkIndex: row.chunkIndex,
+    tokenCount: row.tokenCount,
+    ...scores,
+  };
+
+  if (row.pageNumber != null) {
+    item.pageNumber = row.pageNumber;
+  }
+
+  return item;
+}
+
+function documentIdFilter(filter: SearchFilter): Prisma.Sql | null {
+  if (filter.operator === 'eq') {
+    return Prisma.sql`c."documentId"::text = ${filter.value}`;
+  }
+  if (filter.operator === 'in' && Array.isArray(filter.value)) {
+    return Prisma.sql`c."documentId"::text = ANY(ARRAY[${Prisma.join(filter.value)}]::text[])`;
+  }
+  return null;
+}
+
+function userIdFilter(filter: SearchFilter): Prisma.Sql | null {
+  if (filter.operator === 'eq') {
+    return Prisma.sql`d."userId" = ${filter.value}`;
+  }
+  return null;
+}
+
+function filterToCondition(filter: SearchFilter): Prisma.Sql | null {
+  switch (filter.field) {
+    case 'documentId':
+      return documentIdFilter(filter);
+    case 'userId':
+      return userIdFilter(filter);
+    default:
+      return null;
+  }
+}
 
 export class PgVectorSearchRepository implements ISearchRepository {
   private buildFilterClauses(filters?: SearchFilter[]): Prisma.Sql {
-    if (!filters || filters.length === 0) return Prisma.empty;
+    if (!filters?.length) return Prisma.empty;
 
-    const conditions: Prisma.Sql[] = [];
-    for (const filter of filters) {
-      if (filter.field === 'documentId') {
-        if (filter.operator === 'eq') {
-          conditions.push(Prisma.sql`c."documentId"::text = ${filter.value}`);
-        } else if (filter.operator === 'in' && Array.isArray(filter.value)) {
-          // Prisma.join is useful here, but for simplicity we can construct an IN clause
-          // Assuming simple UUID strings
-          conditions.push(Prisma.sql`c."documentId"::text = ANY(ARRAY[${Prisma.join(filter.value)}]::text[])`);
-        }
-      } else if (filter.field === 'userId') {
-        if (filter.operator === 'eq') {
-          conditions.push(Prisma.sql`d."userId" = ${filter.value}`);
-        }
-      }
-      // Add more filter handlers (tags, metadata) as needed
-    }
+    const conditions = filters
+      .map((filter) => filterToCondition(filter))
+      .filter((condition): condition is Prisma.Sql => condition !== null);
 
     if (conditions.length === 0) return Prisma.empty;
     return Prisma.sql`AND ${Prisma.join(conditions, ' AND ')}`;
@@ -33,12 +97,12 @@ export class PgVectorSearchRepository implements ISearchRepository {
     queryVector: number[],
     topK: number,
     threshold: number,
-    filters?: SearchFilter[]
+    filters?: SearchFilter[],
   ): Promise<SearchResultItem[]> {
     const vectorString = `[${queryVector.join(',')}]`;
     const filterSql = this.buildFilterClauses(filters);
 
-    const result = await prisma.$queryRaw<any[]>`
+    const result = await prisma.$queryRaw<SemanticSearchRow[]>`
       SELECT 
         c.id as "chunkId",
         c."documentId"::text,
@@ -57,20 +121,17 @@ export class PgVectorSearchRepository implements ISearchRepository {
       LIMIT ${topK}
     `;
 
-    return result.map(r => ({
-      ...r,
-      similarityScore: Number(r.similarityScore)
-    }));
+    return result.map((r) => toSearchResult(r, { similarityScore: Number(r.similarityScore) }));
   }
 
   async keywordSearch(
     queryText: string,
     topK: number,
-    filters?: SearchFilter[]
+    filters?: SearchFilter[],
   ): Promise<SearchResultItem[]> {
     const filterSql = this.buildFilterClauses(filters);
 
-    const result = await prisma.$queryRaw<any[]>`
+    const result = await prisma.$queryRaw<KeywordSearchRow[]>`
       SELECT 
         c.id as "chunkId",
         c."documentId"::text,
@@ -88,10 +149,7 @@ export class PgVectorSearchRepository implements ISearchRepository {
       LIMIT ${topK}
     `;
 
-    return result.map(r => ({
-      ...r,
-      rankScore: Number(r.rankScore)
-    }));
+    return result.map((r) => toSearchResult(r, { rankScore: Number(r.rankScore) }));
   }
 
   async hybridSearch(
@@ -99,13 +157,13 @@ export class PgVectorSearchRepository implements ISearchRepository {
     queryVector: number[],
     topK: number,
     threshold: number,
-    filters?: SearchFilter[]
+    filters?: SearchFilter[],
   ): Promise<SearchResultItem[]> {
     // Basic implementation of Reciprocal Rank Fusion (RRF)
     const vectorString = `[${queryVector.join(',')}]`;
     const filterSql = this.buildFilterClauses(filters);
 
-    const result = await prisma.$queryRaw<any[]>`
+    const result = await prisma.$queryRaw<HybridSearchRow[]>`
       WITH semantic_results AS (
         SELECT 
           c.id as chunk_id,
@@ -154,10 +212,11 @@ export class PgVectorSearchRepository implements ISearchRepository {
       LIMIT ${topK}
     `;
 
-    return result.map(r => ({
-      ...r,
-      similarityScore: r.similarityScore ? Number(r.similarityScore) : undefined,
-      rankScore: r.rankScore ? Number(r.rankScore) : undefined
-    }));
+    return result.map((r) => {
+      const scores: Pick<SearchResultItem, 'similarityScore' | 'rankScore'> = {};
+      if (r.similarityScore) scores.similarityScore = Number(r.similarityScore);
+      if (r.rankScore) scores.rankScore = Number(r.rankScore);
+      return toSearchResult(r, scores);
+    });
   }
 }

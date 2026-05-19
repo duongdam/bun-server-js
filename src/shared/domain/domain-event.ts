@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 /**
  * Base class for all domain events.
  * Domain events capture something that happened in the domain.
@@ -32,7 +32,7 @@ export class DomainEventEmitter {
     return this._domainEvents;
   }
 
-  protected addDomainEvent(event: DomainEvent): void {
+  addDomainEvent(event: DomainEvent): void {
     this._domainEvents.push(event);
   }
 

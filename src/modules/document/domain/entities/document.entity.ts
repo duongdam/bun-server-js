@@ -1,8 +1,8 @@
+import { DocumentStatus } from '@prisma/client';
 import { BaseEntity } from '../../../../shared/domain/base.entity';
 import { DomainEventEmitter } from '../../../../shared/domain/domain-event';
-import { DocumentStatus } from '@prisma/client';
 import { DocumentUploadedEvent } from '../events/document-uploaded.event';
-import { ChunkingConfig } from '../value-objects/chunking-config.vo';
+import type { ChunkingConfig } from '../value-objects/chunking-config.vo';
 
 export interface DocumentProps {
   userId: string;
@@ -69,8 +69,7 @@ export class Document extends BaseEntity {
       status: DocumentStatus.PENDING,
     });
 
-    // Using cast any because events is a property we added that encapsulates DomainEventEmitter
-    (doc as any).events.addDomainEvent(
+    doc.events.addDomainEvent(
       new DocumentUploadedEvent(doc.id, doc.filename, doc.mimeType, doc.userId),
     );
     return doc;

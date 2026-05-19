@@ -1,6 +1,6 @@
 import { parse } from 'node-html-parser';
-import { IFileParser, ParsedDocument } from '../../domain/services/file-parser.service';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
+import type { IFileParser, ParsedDocument } from '../../domain/services/file-parser.service';
 
 export class HtmlParser implements IFileParser {
   async parse(buffer: Buffer): Promise<ParsedDocument> {
@@ -9,7 +9,9 @@ export class HtmlParser implements IFileParser {
       const root = parse(htmlContent);
 
       // Strip scripts and styles
-      root.querySelectorAll('script, style').forEach((node) => node.remove());
+      for (const node of root.querySelectorAll('script, style')) {
+        node.remove();
+      }
 
       // Extract raw text
       const text = root.textContent.replace(/\s+/g, ' ').trim();

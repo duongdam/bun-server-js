@@ -1,0 +1,374 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AI Document Platform API",
+    "description": "Production-grade AI document processing platform with semantic search and RAG retrieval",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support",
+      "email": "support@example.com"
+    }
+  },
+  "tags": [
+    {
+      "name": "documents",
+      "description": "Document upload and management"
+    },
+    {
+      "name": "search",
+      "description": "Semantic and hybrid search"
+    },
+    {
+      "name": "retrieval",
+      "description": "RAG retrieval endpoints"
+    },
+    {
+      "name": "jobs",
+      "description": "Background job tracking"
+    },
+    {
+      "name": "health",
+      "description": "Health checks"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "health"
+        ],
+        "summary": "Service health check",
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/api/v1/documents/upload": {
+      "post": {
+        "parameters": [],
+        "operationId": "postApiV1DocumentsUpload",
+        "tags": [
+          "documents"
+        ],
+        "summary": "Upload and index a document",
+        "description": "Uploads a file (PDF, DOCX, TXT, MD, CSV, JSON, HTML) for parsing, chunking, and vector embedding.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "default": "File",
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "chunkingStrategy": {
+                    "type": "string"
+                  },
+                  "chunkSize": {
+                    "anyOf": [
+                      {
+                        "format": "numeric",
+                        "default": 0,
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "chunkOverlap": {
+                    "anyOf": [
+                      {
+                        "format": "numeric",
+                        "default": 0,
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "embeddingProvider": {
+                    "type": "string"
+                  },
+                  "embeddingModel": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "default": "File",
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "chunkingStrategy": {
+                    "type": "string"
+                  },
+                  "chunkSize": {
+                    "anyOf": [
+                      {
+                        "format": "numeric",
+                        "default": 0,
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "chunkOverlap": {
+                    "anyOf": [
+                      {
+                        "format": "numeric",
+                        "default": 0,
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "embeddingProvider": {
+                    "type": "string"
+                  },
+                  "embeddingModel": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "text/plain": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "default": "File",
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "chunkingStrategy": {
+                    "type": "string"
+                  },
+                  "chunkSize": {
+                    "anyOf": [
+                      {
+                        "format": "numeric",
+                        "default": 0,
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "chunkOverlap": {
+                    "anyOf": [
+                      {
+                        "format": "numeric",
+                        "default": 0,
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "embeddingProvider": {
+                    "type": "string"
+                  },
+                  "embeddingModel": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/api/v1/documents/": {
+      "get": {
+        "operationId": "getApiV1Documents",
+        "tags": [
+          "documents"
+        ],
+        "summary": "List user documents",
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/api/v1/documents/{id}": {
+      "get": {
+        "operationId": "getApiV1DocumentsById",
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get document details",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      },
+      "delete": {
+        "operationId": "deleteApiV1DocumentsById",
+        "tags": [
+          "documents"
+        ],
+        "summary": "Delete a document and its embeddings",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/api/v1/documents/{id}/reindex": {
+      "post": {
+        "operationId": "postApiV1DocumentsByIdReindex",
+        "tags": [
+          "documents"
+        ],
+        "summary": "Reindex a document with new settings",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/api/v1/documents/{id}/chunks": {
+      "get": {
+        "operationId": "getApiV1DocumentsByIdChunks",
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get paginated chunks for a document",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/api/v1/jobs/{id}": {
+      "get": {
+        "operationId": "getApiV1JobsById",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get background job status and progress",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/api/v1/search/": {
+      "post": {
+        "operationId": "postApiV1Search",
+        "tags": [
+          "search"
+        ],
+        "summary": "Perform semantic, hybrid, or keyword search on indexed documents",
+        "responses": {
+          "200": {}
+        }
+      }
+    },
+    "/api/v1/search/retrieval": {
+      "post": {
+        "operationId": "postApiV1SearchRetrieval",
+        "tags": [
+          "search"
+        ],
+        "summary": "Retrieve context chunks optimized for RAG token budgets",
+        "responses": {
+          "200": {}
+        }
+      }
+    }
+  }
+}

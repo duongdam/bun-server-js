@@ -1,25 +1,48 @@
-import { PrismaClient, DocumentStatus } from '@prisma/client';
+import { DocumentStatus, UserRole } from '@prisma/client';
+import { prisma } from '../src/shared/infrastructure/prisma/client';
+import { logger } from '../src/shared/infrastructure/logger/pino.logger';
 
-const prisma = new PrismaClient();
+async function hashPassword(plain: string): Promise<string> {
+  return Bun.password.hash(plain, {
+    algorithm: 'argon2id',
+    memoryCost: 19_456,
+    timeCost: 2,
+  });
+}
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  logger.info('🌱 Seeding database...');
 
-  // Create test user (for local development only)
-  const testUserId = '00000000-0000-0000-0000-000000000001';
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@gmail.com';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ryan@123';
+  const passwordHash = await hashPassword(adminPassword);
 
-  // Create a sample document record
+  const admin = await prisma.user.upsert({
+    where: { email: adminEmail.toLowerCase() },
+    update: { passwordHash },
+    create: {
+      id: '00000000-0000-0000-0000-000000000001',
+      email: adminEmail.toLowerCase(),
+      passwordHash,
+      role: UserRole.ADMIN,
+      displayName: 'Seed Admin',
+      isActive: true,
+    },
+  });
+
+  logger.info({ admin }, '✅ Admin user');
+
   const doc = await prisma.document.upsert({
     where: {
       userId_contentHash: {
-        userId: testUserId,
+        userId: admin.id,
         contentHash: 'seed-hash-abc123',
       },
     },
     update: {},
     create: {
       id: '00000000-0000-0000-0000-000000000002',
-      userId: testUserId,
+      userId: admin.id,
       filename: 'sample-guide.txt',
       mimeType: 'text/plain',
       fileSize: BigInt(1024),
@@ -39,8 +62,8 @@ async function main() {
     },
   });
 
-  console.log(`✅ Created document: ${doc.id} (${doc.filename})`);
-  console.log('✅ Seed complete');
+  logger.info({ doc }, '✅ Sample document');
+  logger.info('✅ Seed complete');
 }
 
 main()

@@ -32,7 +32,8 @@ export class FileType {
 
   static fromFilename(filename: string, mimeType: string): FileType {
     const parts = filename.split('.');
-    const ext = parts.length > 1 ? parts[parts.length - 1]! : '';
+    const lastPart = parts.at(-1);
+    const ext = parts.length > 1 && lastPart !== undefined ? lastPart : '';
     return new FileType(ext, mimeType);
   }
 }

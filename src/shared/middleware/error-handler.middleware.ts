@@ -1,5 +1,4 @@
-import { randomUUID } from 'crypto';
-import type { Context } from 'elysia';
+import { randomUUID } from 'node:crypto';
 import { logger } from '../infrastructure/logger/pino.logger';
 
 // ─── Domain Error Hierarchy ────────────────────────────────
@@ -80,24 +79,31 @@ interface ErrorResponse {
   requestId?: string;
 }
 
-export function errorHandler({ code, error, set }: Context & { code: string; error: Error }) {
+export interface ErrorHandlerContext {
+  code: string | number;
+  error: unknown;
+  set: { status?: number | string };
+}
+
+export function errorHandler({ code, error, set }: ErrorHandlerContext) {
   const requestId = randomUUID();
+  const err = error instanceof Error ? error : new Error(String(error));
 
   // Domain errors — known, structured
-  if (error instanceof DomainError) {
-    set.status = error.statusCode as number;
+  if (err instanceof DomainError) {
+    set.status = err.statusCode;
     const response: ErrorResponse = {
-      error: error.code,
-      message: error.message,
+      error: err.code,
+      message: err.message,
       requestId,
     };
-    if (error instanceof ValidationError && error.details) {
-      response.details = error.details;
+    if (err instanceof ValidationError && err.details) {
+      response.details = err.details;
     }
-    if (error instanceof ConflictError && error.meta) {
-      response.details = error.meta;
+    if (err instanceof ConflictError && err.meta) {
+      response.details = err.meta;
     }
-    logger.warn({ code: error.code, message: error.message, requestId }, 'Domain error');
+    logger.warn({ code: err.code, message: err.message, requestId }, 'Domain error');
     return response;
   }
 
@@ -118,7 +124,7 @@ export function errorHandler({ code, error, set }: Context & { code: string; err
   }
 
   // Unknown errors — log and return generic 500
-  logger.error({ error, code, requestId }, 'Unhandled error');
+  logger.error({ error: err, code, requestId }, 'Unhandled error');
   set.status = 500;
   return {
     error: 'INTERNAL_SERVER_ERROR',

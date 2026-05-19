@@ -1,4 +1,8 @@
 import { Elysia, t } from 'elysia';
+import {
+  type AuthDeriveContext,
+  deriveAuthenticatedUser,
+} from '../../../shared/middleware/derive-auth-user';
 import { DocumentController } from './document.controller';
 
 // Note: To keep things Elysia-native and avoid heavy dependency injection for this size,
@@ -10,27 +14,7 @@ export const documentRoutes = new Elysia({ prefix: '/documents' })
   // Because Elysia context resolution is static, we define the derived state.
   // Assuming a mocked auth for development if JWT isn't fully set up yet by the user,
   // but we'll use the proper header extraction if available.
-  .derive(async ({ request, jwt, set }: any) => {
-    // Basic mock user for testing if no auth header is provided (for local dev only)
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader && process.env['NODE_ENV'] === 'development') {
-      return { user: { sub: '00000000-0000-0000-0000-000000000001', role: 'admin' } };
-    }
-
-    if (!authHeader) {
-      set.status = 401;
-      throw new Error('Unauthorized');
-    }
-
-    const token = authHeader.split(' ')[1];
-    const payload = await jwt.verify(token);
-    if (!payload) {
-      set.status = 401;
-      throw new Error('Unauthorized');
-    }
-
-    return { user: payload };
-  })
+  .derive((context) => deriveAuthenticatedUser(context as unknown as AuthDeriveContext))
   // Optional: Add rate limiting
   // .onBeforeHandle(async ({ user, set }) => {
   //   const rlError = await rateLimitMiddleware(user.sub, set);
@@ -64,7 +48,7 @@ export const documentRoutes = new Elysia({ prefix: '/documents' })
   .get(
     '/',
     async ({ query, user }) => {
-      return controller.list(user.sub, query as any);
+      return controller.list(user.sub, query);
     },
     {
       detail: { tags: ['documents'], summary: 'List user documents' },
@@ -97,14 +81,14 @@ export const documentRoutes = new Elysia({ prefix: '/documents' })
     },
     {
       detail: { tags: ['documents'], summary: 'Reindex a document with new settings' },
-    }
+    },
   )
   .get(
     '/:id/chunks',
     async ({ params, query, user }) => {
-      return controller.getChunks(user.sub, params.id, query as any);
+      return controller.getChunks(user.sub, params.id, query);
     },
     {
       detail: { tags: ['documents'], summary: 'Get paginated chunks for a document' },
-    }
+    },
   );

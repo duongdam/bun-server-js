@@ -1,5 +1,5 @@
-import { BaseEntity } from '../../../../shared/domain/base.entity';
 import { JobStatus } from '@prisma/client';
+import { BaseEntity } from '../../../../shared/domain/base.entity';
 
 export interface AIProcessingJobProps {
   documentId: string;

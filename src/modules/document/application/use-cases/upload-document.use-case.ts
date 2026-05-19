@@ -1,20 +1,22 @@
-import { UploadDocumentDto } from '../dtos/upload-document.dto';
-import { DocumentResponseDto, toDocumentResponseDto } from '../dtos/document-response.dto';
-import { PrismaDocumentRepository } from '../../infrastructure/prisma-document.repository';
-import { Document } from '../../domain/entities/document.entity';
-import { FileType } from '../../domain/value-objects/file-type.vo';
-import { ChunkingConfig } from '../../domain/value-objects/chunking-config.vo';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs/promises';
+import os from 'node:os';
+import * as path from 'node:path';
 import {
   ConflictError,
   FileTooLargeError,
 } from '../../../../shared/middleware/error-handler.middleware';
+import { activityLogService } from '../../../activity-log/domain/services/activity-log.service';
+import { AIProcessingJob } from '../../../job/domain/entities/processing-job.entity';
+import { createEmbeddingProvider } from '../../../embedding/infrastructure/create-embedding-provider';
 import { DocumentQueue } from '../../../job/infrastructure/bullmq.queue';
 import { PrismaJobRepository } from '../../../job/infrastructure/prisma-job.repository';
-import { AIProcessingJob } from '../../../job/domain/entities/processing-job.entity';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as crypto from 'crypto';
-import os from 'os';
+import { Document } from '../../domain/entities/document.entity';
+import { ChunkingConfig } from '../../domain/value-objects/chunking-config.vo';
+import { FileType } from '../../domain/value-objects/file-type.vo';
+import { PrismaDocumentRepository } from '../../infrastructure/prisma-document.repository';
+import { type DocumentResponseDto, toDocumentResponseDto } from '../dtos/document-response.dto';
+import type { UploadDocumentDto } from '../dtos/upload-document.dto';
 
 export class UploadDocumentUseCase {
   private docRepo: PrismaDocumentRepository;
@@ -32,7 +34,7 @@ export class UploadDocumentUseCase {
     dto: UploadDocumentDto,
   ): Promise<{ document: DocumentResponseDto; jobId: string }> {
     const file = dto.file;
-    const maxSize = parseInt(process.env['MAX_FILE_SIZE'] || '104857600', 10);
+    const maxSize = Number.parseInt(process.env.MAX_FILE_SIZE || '104857600', 10);
 
     if (file.size > maxSize) {
       throw new FileTooLargeError(maxSize);
@@ -62,12 +64,8 @@ export class UploadDocumentUseCase {
       );
     }
 
-    // Determine dimensions (mocking simple map for the example)
-    const embeddingDimension = dto.embeddingModel.includes('large')
-      ? 3072
-      : dto.embeddingModel.includes('MiniLM')
-        ? 384
-        : 1536;
+    const embeddingProvider = createEmbeddingProvider(dto.embeddingProvider);
+    const embeddingDimension = embeddingProvider.dimension;
 
     // Create Document Entity
     const doc = Document.create({
@@ -77,9 +75,9 @@ export class UploadDocumentUseCase {
       fileSize: file.size,
       contentHash: hash,
       chunkingConfig,
-      embeddingModel: dto.embeddingModel,
+      embeddingModel: embeddingProvider.model,
       embeddingDimension,
-      embeddingProvider: dto.embeddingProvider,
+      embeddingProvider: embeddingProvider.provider,
       tags: dto.tags,
       metadata: dto.metadata,
     });
@@ -102,6 +100,19 @@ export class UploadDocumentUseCase {
       jobId: savedJob.id,
       filePath: tempPath,
       mimeType: file.type,
+    });
+
+    await activityLogService.record({
+      userId,
+      domain: 'DOCUMENT',
+      entityId: savedDoc.id,
+      action: 'CREATED',
+      message: 'document.uploaded',
+      metadata: {
+        filename: savedDoc.filename,
+        mimeType: savedDoc.mimeType,
+        jobId: savedJob.id,
+      },
     });
 
     return {

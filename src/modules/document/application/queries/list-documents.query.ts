@@ -1,6 +1,6 @@
-import { IDocumentRepository } from '../../domain/repositories/document.repository.interface';
-import { DocumentResponseDto, toDocumentResponseDto } from '../dtos/document-response.dto';
-import { DocumentStatus } from '@prisma/client';
+import type { DocumentStatus } from '@prisma/client';
+import type { IDocumentRepository } from '../../domain/repositories/document.repository.interface';
+import { type DocumentResponseDto, toDocumentResponseDto } from '../dtos/document-response.dto';
 
 export interface ListDocumentsQueryParams {
   userId: string;
@@ -23,13 +23,13 @@ export class ListDocumentsQuery {
   async execute(params: ListDocumentsQueryParams): Promise<PaginatedDocumentResponse> {
     const page = params.page || 1;
     const limit = params.limit || 10;
-    
+
     const result = await this.documentRepository.findByUserId(
       params.userId,
       page,
       limit,
       params.status,
-      params.tags
+      params.tags,
     );
 
     return {

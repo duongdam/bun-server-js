@@ -1,8 +1,5 @@
+import { NotFoundError } from '../../../../shared/middleware/error-handler.middleware';
 import { PrismaJobRepository } from '../../infrastructure/prisma-job.repository';
-import {
-  NotFoundError,
-  UnauthorizedError,
-} from '../../../../shared/middleware/error-handler.middleware';
 
 export interface JobProgressDto {
   id: string;

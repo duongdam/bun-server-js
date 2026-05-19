@@ -1,4 +1,4 @@
-import { Document } from '../../domain/entities/document.entity';
+import type { Document } from '../../domain/entities/document.entity';
 
 export interface DocumentResponseDto {
   id: string;

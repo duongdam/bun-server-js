@@ -1,7 +1,7 @@
-import { Queue, Job } from 'bullmq';
-import { redis } from '../../../shared/infrastructure/redis/client';
-import { DOCUMENT_PROCESSING_QUEUE, DocumentProcessingJobPayload } from '../../../worker';
+import { type Job, Queue } from 'bullmq';
 import { logger } from '../../../shared/infrastructure/logger/pino.logger';
+import { redis } from '../../../shared/infrastructure/redis/client';
+import { DOCUMENT_PROCESSING_QUEUE, type DocumentProcessingJobPayload } from '../../../worker';
 
 export class DocumentQueue {
   private queue: Queue<DocumentProcessingJobPayload>;
@@ -10,7 +10,7 @@ export class DocumentQueue {
     this.queue = new Queue<DocumentProcessingJobPayload>(DOCUMENT_PROCESSING_QUEUE, {
       connection: redis,
       defaultJobOptions: {
-        attempts: parseInt(process.env['JOB_MAX_RETRIES'] ?? '3', 10),
+        attempts: Number.parseInt(process.env.JOB_MAX_RETRIES ?? '3', 10),
         backoff: {
           type: 'exponential',
           delay: 2000,

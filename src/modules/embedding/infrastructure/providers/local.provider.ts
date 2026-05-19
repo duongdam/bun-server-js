@@ -1,6 +1,6 @@
-import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers';
-import { IEmbeddingProvider } from './embedding-provider.interface';
+import { type FeatureExtractionPipeline, pipeline } from '@xenova/transformers';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
+import type { IEmbeddingProvider } from './embedding-provider.interface';
 
 export class LocalEmbeddingProvider implements IEmbeddingProvider {
   public readonly provider = 'local';
@@ -9,7 +9,7 @@ export class LocalEmbeddingProvider implements IEmbeddingProvider {
   private _pipelinePromise: Promise<FeatureExtractionPipeline> | null = null;
 
   constructor() {
-    this.model = process.env['LOCAL_MODEL'] || 'Xenova/all-MiniLM-L6-v2';
+    this.model = process.env.LOCAL_MODEL || 'Xenova/all-MiniLM-L6-v2';
     this.dimension = 384; // Fixed for all-MiniLM-L6-v2
   }
 

@@ -3,6 +3,7 @@ import { UnauthorizedError } from './error-handler.middleware';
 export interface JwtPayload {
   sub: string;
   role: 'admin' | 'user' | 'readonly';
+  email?: string;
   iat?: number;
   exp?: number;
 }
