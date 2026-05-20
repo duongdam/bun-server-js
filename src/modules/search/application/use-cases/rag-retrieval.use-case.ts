@@ -1,12 +1,12 @@
-import { logger } from '@/shared/infrastructure/logger/pino.logger';
-import { prisma } from '@/shared/infrastructure/prisma/client';
 import { SearchType } from '@prisma/client';
+import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
+import { prisma } from '../../../../shared/infrastructure/prisma/client';
 
 import type { EmbeddingService } from '../../../embedding/domain/services/embedding.service';
 import type { SearchService } from '../../domain/services/search.service';
-import { parseSearchFilters } from '../parse-search-filters';
 import type { RetrievalRequestDto } from '../dtos/retrieval-request.dto';
 import type { RetrievalResponseDto } from '../dtos/retrieval-response.dto';
+import { parseSearchFilters } from '../parse-search-filters';
 
 export class RagRetrievalUseCase {
   constructor(

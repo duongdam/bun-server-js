@@ -92,8 +92,9 @@ A full OpenAPI schema is available at `GET /swagger` when running the applicatio
 | `DATABASE_URL` | PostgreSQL connection string | *Required* |
 | `REDIS_URL` | Redis connection string for BullMQ | *Required* |
 | `JWT_SECRET` | Secret for issuing/verifying JWTs | *Required* |
-| `EMBEDDING_PROVIDER` | `openai`, `huggingface`, or `local` | `openai` |
-| `EMBEDDING_MODEL` | Model ID to use for embeddings | `text-embedding-3-small` |
+| `EMBEDDING_PROVIDER` | `gemini`, `openai`, `huggingface`, or `local` | `gemini` |
+| `EMBEDDING_MODEL` | Model ID for embeddings | `gemini-embedding-2` (with `EMBEDDING_DIMENSION` / DB aligned to 768 by default) |
+| `GEMINI_API_KEY` | Required when `EMBEDDING_PROVIDER` is `gemini` | *Required in non-test env* |
 | `OPENAI_API_KEY` | Required if `EMBEDDING_PROVIDER` is `openai` | `""` |
 | `MAX_FILE_SIZE` | Maximum file upload size in bytes | `104857600` (100MB) |
 | `WORKER_CONCURRENCY` | Number of concurrent jobs the worker processes | `4` |

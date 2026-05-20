@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { ValidationError as ElysiaValidationError } from 'elysia';
 import { logger } from '../infrastructure/logger/pino.logger';
 
 // ─── Domain Error Hierarchy ────────────────────────────────
@@ -85,6 +86,21 @@ export interface ErrorHandlerContext {
   set: { status?: number | string };
 }
 
+function elysiaValidationResponse(requestId: string, err: Error): ErrorResponse {
+  if (err instanceof ElysiaValidationError) {
+    const details = err.all?.length ? err.all : (err.messageValue ?? err.message);
+    logger.warn({ requestId, type: err.type, details }, 'Elysia request validation failed');
+    return {
+      error: 'VALIDATION_ERROR',
+      message: err.message || 'Request validation failed',
+      details,
+      requestId,
+    };
+  }
+  logger.warn({ requestId, error: err }, 'Request validation failed (non-Elysia error shape)');
+  return { error: 'VALIDATION_ERROR', message: 'Request validation failed', requestId };
+}
+
 export function errorHandler({ code, error, set }: ErrorHandlerContext) {
   const requestId = randomUUID();
   const err = error instanceof Error ? error : new Error(String(error));
@@ -107,10 +123,10 @@ export function errorHandler({ code, error, set }: ErrorHandlerContext) {
     return response;
   }
 
-  // Elysia built-in codes
+  // Elysia built-in codes (route schema / body / query / params)
   if (code === 'VALIDATION') {
     set.status = 422;
-    return { error: 'VALIDATION_ERROR', message: 'Request validation failed', requestId };
+    return elysiaValidationResponse(requestId, err);
   }
 
   if (code === 'NOT_FOUND') {

@@ -94,9 +94,10 @@ if (import.meta.main) {
       {
         embeddingProvider: envResult.data.EMBEDDING_PROVIDER,
         embeddingModel: envResult.data.EMBEDDING_MODEL,
+        geminiApiKey: maskSecret(envResult.data.GEMINI_API_KEY),
         openaiApiKey: maskSecret(envResult.data.OPENAI_API_KEY),
       },
-      'Worker embedding env (OPENAI_API_KEY masked)',
+      'Worker embedding env (API keys masked)',
     );
   }
 
