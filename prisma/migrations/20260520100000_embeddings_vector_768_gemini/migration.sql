@@ -1,4 +1,4 @@
--- Gemini default embedding (`gemini-embedding-2` truncated to 768) uses 768 dimensions.
+-- Gemini default embedding (`gemini-embedding-001` truncated to 768) uses 768 dimensions.
 -- Apply after switching EMBEDDING_PROVIDER to gemini; re-index existing documents if dimension changed.
 
 DROP INDEX IF EXISTS "embeddings_vector_hnsw_idx";

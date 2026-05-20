@@ -27,16 +27,19 @@ describe('Search use cases (query embedding)', () => {
 
     const uc = new SemanticSearchUseCase(searchService, embeddingService);
     const res = await uc.execute('user-1', {
-      query: 'hello',
+      query: 'hello **world**',
       searchType: 'semantic',
       topK: 10,
       similarityThreshold: 0.3,
+      streaming: false,
     });
 
-    expect(embedBatch).toHaveBeenCalledWith(['hello']);
+    expect(embedBatch).toHaveBeenCalledWith(['hello **world**'], { purpose: 'query' });
     expect(semanticSearch).toHaveBeenCalledWith(queryVector, 10, 0.3, expect.any(Array));
-    expect(res.query).toBe('hello');
+    expect(res.query).toBe('hello **world**');
     expect(res.results).toHaveLength(1);
+    expect(res.markdown).toContain('## Search results');
+    expect(res.markdown).toContain('hello **world**');
   });
 
   test('HybridSearchUseCase embeds query then runs hybrid search', async () => {
@@ -65,12 +68,14 @@ describe('Search use cases (query embedding)', () => {
       searchType: 'hybrid',
       topK: 5,
       similarityThreshold: 0.2,
+      streaming: false,
     });
 
-    expect(embedBatch).toHaveBeenCalledWith(['find me']);
+    expect(embedBatch).toHaveBeenCalledWith(['find me'], { purpose: 'query' });
     expect(hybridSearch).toHaveBeenCalledWith('find me', queryVector, 5, 0.2, expect.any(Array));
     expect(res.query).toBe('find me');
     expect(res.results[0]?.rankScore).toBe(0.85);
+    expect(res.markdown).toContain('## Search results');
   });
 
   test('RagRetrievalUseCase embeds query then runs semantic search for retrieval', async () => {
@@ -100,9 +105,10 @@ describe('Search use cases (query embedding)', () => {
       similarityThreshold: 0.1,
     });
 
-    expect(embedBatch).toHaveBeenCalledWith(['rag question']);
+    expect(embedBatch).toHaveBeenCalledWith(['rag question'], { purpose: 'query' });
     expect(semanticSearch).toHaveBeenCalledWith(queryVector, 6, 0.1, expect.any(Array));
     expect(res.query).toBe('rag question');
     expect(res.context.length).toBeGreaterThan(0);
+    expect(res.markdown).toContain('## RAG retrieval');
   });
 });

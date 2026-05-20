@@ -6,7 +6,7 @@
 
 ## Summary
 
-Add a **Gemini** embedding provider, make it the **default** embedding backend for the Bun + TypeScript AI document platform, and ensure **semantic** and **hybrid** search continue to embed queries through the shared `EmbeddingService` so ingest and search stay aligned. Include **unit tests** (`bun test tests/unit`) with mocks. Align PostgreSQL `embeddings.vector` dimension with the Gemini model (e.g. 768 for `gemini-embedding-2` with `outputDimensionality`) via `scripts/sync-embedding-dimension.ts` and/or a Prisma SQL migration.
+Add a **Gemini** embedding provider, make it the **default** embedding backend for the Bun + TypeScript AI document platform, and ensure **semantic** and **hybrid** search continue to embed queries through the shared `EmbeddingService` so ingest and search stay aligned. Include **unit tests** (`bun test tests/unit`) with mocks. Align PostgreSQL `embeddings.vector` dimension with the Gemini model (e.g. 768 for `gemini-embedding-001` with `outputDimensionality`) via `scripts/sync-embedding-dimension.ts` and/or a Prisma SQL migration.
 
 ## Technical Context
 

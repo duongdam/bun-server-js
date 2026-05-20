@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "name": "AI Document Platform",
-    "description": "API collection for bun-server-js AI Document Platform.\n\n**Auth flow**\n1. Run **Auth → Login** (or Register).\n2. The test script saves `accessToken` to collection variables.\n3. All protected requests use `Authorization: Bearer {{accessToken}}` automatically.\n\n**Suggested order**\nLogin → Upload Document → Get Job Status → Search → RAG Retrieval",
+    "description": "API collection for bun-server-js AI Document Platform.\n\n**Auth flow**\n1. Run **Auth → Login** (or Register).\n2. The test script saves `accessToken` to collection variables.\n3. All protected requests use `Authorization: Bearer {{accessToken}}` automatically.\n\n**Search & RAG**\n- `POST /api/v1/search` (JSON): responses include `results` plus **`markdown`** (CommonMark / GFM).\n- Same route with **`\"streaming\": true`**: returns **`text/event-stream`** (SSE). Events: `meta` (JSON with `results` + `markdown`), then `delta` (`{ \"text\": \"...\" }`), then `done`. Requires `GEMINI_API_KEY` and `GEMINI_MODEL` for the streamed answer.\n- `POST /api/v1/search/retrieval`: JSON includes **`markdown`** for packed RAG context.\n\n**Suggested order**\nLogin → Upload Document → Get Job Status → Search (JSON) → Search (streaming) → RAG Retrieval\n\n**Base URL**\nDefault `{{baseUrl}}` is `http://localhost:3000`. If your server uses another `PORT` (e.g. `8080`), set the collection variable `baseUrl` accordingly.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -250,6 +250,18 @@
                   "value": "50",
                   "type": "text",
                   "disabled": true
+                },
+                {
+                  "key": "embeddingProvider",
+                  "value": "gemini",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "embeddingModel",
+                  "value": "gemini-embedding-2",
+                  "type": "text",
+                  "disabled": true
                 }
               ]
             },
@@ -258,7 +270,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "documents", "upload"]
             },
-            "description": "multipart/form-data — pick a file in the Body tab. Saves `documentId` and `jobId` on success."
+            "description": "multipart/form-data — required field **`file`** (pick a file in Body). Optional: `embeddingProvider` (gemini), `embeddingModel` (e.g. gemini-embedding-2), chunking fields. Saves `documentId` and `jobId` on success."
           },
           "response": []
         },
@@ -383,9 +395,10 @@
     },
     {
       "name": "Search",
+      "description": "Search and RAG. JSON responses include a **`markdown`** field (CommonMark). Use **`streaming: true`** for SSE (`text/event-stream`).",
       "item": [
         {
-          "name": "Search (semantic / hybrid / keyword)",
+          "name": "Search — JSON (semantic / hybrid / keyword)",
           "request": {
             "method": "POST",
             "header": [
@@ -393,15 +406,70 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"What are the main topics in the document?\",\n  \"searchType\": \"hybrid\",\n  \"topK\": 10,\n  \"similarityThreshold\": 0.3,\n  \"filters\": {\n    \"documentIds\": [\"{{documentId}}\"]\n  }\n}"
+              "raw": "{\n  \"query\": \"What are the main topics in the document?\",\n  \"searchType\": \"hybrid\",\n  \"streaming\": false,\n  \"topK\": 10,\n  \"similarityThreshold\": 0.3,\n  \"filters\": {\n    \"documentIds\": [\"{{documentId}}\"]\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/search",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "search"]
-            }
+            },
+            "description": "Returns JSON: `results`, **`markdown`** (formatted hits + query), `query`, `searchType`, `latencyMs`. Set `searchType` to `semantic`, `hybrid`, or `keyword`. Omit `filters` or `{}` if `documentId` is not set yet."
           },
-          "response": []
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Has markdown', () => {",
+                  "    pm.expect(body).to.have.property('markdown');",
+                  "    pm.expect(body.markdown).to.be.a('string').and.include('##');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search — streaming (SSE)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "text/event-stream" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What are the main topics in the document?\",\n  \"searchType\": \"semantic\",\n  \"streaming\": true,\n  \"topK\": 8,\n  \"similarityThreshold\": 0.25,\n  \"filters\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "search"]
+            },
+            "description": "Response is **`text/event-stream`** (not JSON). First event: `meta` with `results` + `markdown`; then `delta` chunks; then `done`. Requires `GEMINI_API_KEY`. In Postman, open **Console** or view **Raw** to see events. For CLI: `curl -N -H 'Authorization: Bearer …' -H 'Content-Type: application/json' -d '{\"query\":\"…\",\"streaming\":true}' {{baseUrl}}/api/v1/search`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if ([200].includes(pm.response.code)) {",
+                  "  pm.test('Content-Type is SSE', () => {",
+                  "    const ct = pm.response.headers.get('Content-Type') || '';",
+                  "    pm.expect(ct).to.include('text/event-stream');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "RAG Retrieval",
@@ -418,9 +486,27 @@
               "raw": "{{baseUrl}}/api/v1/search/retrieval",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "search", "retrieval"]
-            }
+            },
+            "description": "Returns JSON: `context`, **`markdown`**, `totalTokens`, `sources`, `query`, `latencyMs`."
           },
-          "response": []
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Has markdown', () => {",
+                  "    pm.expect(body).to.have.property('markdown');",
+                  "    pm.expect(body.markdown).to.include('## RAG retrieval');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

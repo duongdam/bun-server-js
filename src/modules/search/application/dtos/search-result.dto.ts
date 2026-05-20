@@ -15,6 +15,8 @@ export type SearchResultDto = z.infer<typeof SearchResultSchema>;
 
 export const SearchResponseSchema = z.object({
   results: z.array(SearchResultSchema),
+  /** Same payload as structured `results`, in CommonMark / GFM Markdown (tables + fenced excerpts). */
+  markdown: z.string(),
   query: z.string(),
   searchType: z.string(),
   latencyMs: z.number(),

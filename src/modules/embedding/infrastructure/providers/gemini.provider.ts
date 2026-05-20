@@ -1,11 +1,11 @@
 import type { EmbedContentRequest, GenerativeModel } from '@google/generative-ai';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
-import type { IEmbeddingProvider } from './embedding-provider.interface';
+import type { EmbedCallOptions, IEmbeddingProvider } from './embedding-provider.interface';
 
-/** Gemini API embedding model (see https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2). */
-const DEFAULT_MODEL = 'gemini-embedding-2';
+/** Gemini API embedding model (see https://ai.google.dev/gemini-api/docs/models/gemini-embedding-001). */
+const DEFAULT_MODEL = 'gemini-embedding-001';
 /**
- * Default truncated output size for `gemini-embedding-2` to match `vector(768)` in Postgres (`outputDimensionality`).
+ * Default truncated output size for `gemini-embedding-001` to match `vector(768)` in Postgres (`outputDimensionality`).
  * Set `EMBEDDING_DIMENSION` if you use a different size or migrate the column.
  */
 const DEFAULT_DIMENSION = 768;
@@ -61,17 +61,22 @@ export class GeminiEmbeddingProvider implements IEmbeddingProvider {
     return await this.lazyClient;
   }
 
-  async embed(texts: string[]): Promise<number[][]> {
+  async embed(texts: string[], options?: EmbedCallOptions): Promise<number[][]> {
     if (texts.length === 0) return [];
 
     try {
       const { TaskType } = await import('@google/generative-ai');
+      type GeminiTask = (typeof TaskType)[keyof typeof TaskType];
       const modelClient = await this.resolveModelClient();
+      const purpose = options?.purpose ?? 'document';
+      const fallback: GeminiTask =
+        purpose === 'query' ? TaskType.RETRIEVAL_QUERY : TaskType.RETRIEVAL_DOCUMENT;
+      const taskType = (options?.geminiTaskType ?? fallback) as GeminiTask;
 
       const requests: (EmbedContentRequest & { outputDimensionality?: number })[] = texts.map(
         (text) => ({
           content: { role: 'user', parts: [{ text }] },
-          taskType: TaskType.RETRIEVAL_DOCUMENT,
+          taskType,
           outputDimensionality: this.dimension,
         }),
       );

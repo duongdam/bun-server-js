@@ -15,7 +15,7 @@ describe('GeminiEmbeddingProvider', () => {
         embeddings: [{ values: [0.1, 0.2] }, { values: [0.3, 0.4] }],
       }),
     );
-    process.env.EMBEDDING_MODEL = 'gemini-embedding-2';
+    process.env.EMBEDDING_MODEL = 'gemini-embedding-001';
     process.env.EMBEDDING_DIMENSION = '2';
   });
 
@@ -36,10 +36,44 @@ describe('GeminiEmbeddingProvider', () => {
     ]);
     expect(batchEmbedContents).toHaveBeenCalledTimes(1);
     const batchArg = (batchEmbedContents.mock.calls as unknown[][])[0]?.[0] as {
-      requests: Array<{ outputDimensionality?: number }>;
+      requests: Array<{ outputDimensionality?: number; taskType?: string }>;
     };
     expect(batchArg.requests[0]?.outputDimensionality).toBe(2);
     expect(batchArg.requests[1]?.outputDimensionality).toBe(2);
+    expect(batchArg.requests[0]?.taskType).toBe('RETRIEVAL_DOCUMENT');
+    expect(batchArg.requests[1]?.taskType).toBe('RETRIEVAL_DOCUMENT');
+  });
+
+  test('embed uses RETRIEVAL_QUERY when purpose is query (search / RAG)', async () => {
+    batchEmbedContents.mockImplementationOnce(() =>
+      Promise.resolve({
+        embeddings: [{ values: [0.1, 0.2] }],
+      }),
+    );
+    const provider = new GeminiEmbeddingProvider({
+      modelClient: { batchEmbedContents },
+    });
+    await provider.embed(['search phrase'], { purpose: 'query' });
+    const batchArg = (batchEmbedContents.mock.calls as unknown[][])[0]?.[0] as {
+      requests: Array<{ taskType?: string }>;
+    };
+    expect(batchArg.requests[0]?.taskType).toBe('RETRIEVAL_QUERY');
+  });
+
+  test('embed forwards geminiTaskType when set (e.g. QUESTION_ANSWERING)', async () => {
+    batchEmbedContents.mockImplementationOnce(() =>
+      Promise.resolve({
+        embeddings: [{ values: [0.1, 0.2] }],
+      }),
+    );
+    const provider = new GeminiEmbeddingProvider({
+      modelClient: { batchEmbedContents },
+    });
+    await provider.embed(['q'], { purpose: 'query', geminiTaskType: 'QUESTION_ANSWERING' });
+    const batchArg = (batchEmbedContents.mock.calls as unknown[][])[0]?.[0] as {
+      requests: Array<{ taskType?: string }>;
+    };
+    expect(batchArg.requests[0]?.taskType).toBe('QUESTION_ANSWERING');
   });
 
   test('embed returns empty array for empty input', async () => {

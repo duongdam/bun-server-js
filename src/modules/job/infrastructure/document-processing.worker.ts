@@ -128,7 +128,7 @@ export async function processDocument(payload: DocumentProcessingJobPayload, wor
 
     const textsToEmbed = chunksWithIds.map((c) => c.content);
     const embedStart = Date.now();
-    const embeddings = await embeddingService.embedBatch(textsToEmbed);
+    const embeddings = await embeddingService.embedBatch(textsToEmbed, { purpose: 'document' });
     const embedDurationMs = Date.now() - embedStart;
 
     await activityLogService.record({

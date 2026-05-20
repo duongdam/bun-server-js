@@ -10,8 +10,8 @@ export const serverEnvSchema = z
     REDIS_URL: z.string().url('REDIS_URL must be a valid URL'),
     ALLOWED_ORIGINS: z.string().optional(),
     EMBEDDING_PROVIDER: z.string().default('gemini'),
-    EMBEDDING_MODEL: z.string().default('gemini-embedding-2'),
-    /** Must match DB column `embeddings.vector` — 768 (Gemini `gemini-embedding-2` with outputDimensionality), 384 (local/MiniLM), 1536 (OpenAI small), 3072 (large) */
+    EMBEDDING_MODEL: z.string().default('gemini-embedding-001'),
+    /** Must match DB column `embeddings.vector` — 768 (Gemini `gemini-embedding-001` with outputDimensionality), 384 (local/MiniLM), 1536 (OpenAI small), 3072 (large) */
     EMBEDDING_DIMENSION: z.coerce.number().int().positive().optional(),
     GEMINI_API_KEY: z.string().optional(),
     OPENAI_API_KEY: z.string().optional(),

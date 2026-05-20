@@ -1,6 +1,9 @@
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
 import { createEmbeddingProvider } from '../../infrastructure/create-embedding-provider';
-import type { IEmbeddingProvider } from '../../infrastructure/providers/embedding-provider.interface';
+import type {
+  EmbedCallOptions,
+  IEmbeddingProvider,
+} from '../../infrastructure/providers/embedding-provider.interface';
 
 export class EmbeddingService {
   readonly provider: IEmbeddingProvider;
@@ -19,8 +22,9 @@ export class EmbeddingService {
 
   /**
    * Generates embeddings with automatic retry and batching logic.
+   * @param options Pass `{ purpose: 'query' }` for search/RAG query strings (Gemini uses RETRIEVAL_QUERY).
    */
-  async embedBatch(chunks: string[]): Promise<number[][]> {
+  async embedBatch(chunks: string[], options?: EmbedCallOptions): Promise<number[][]> {
     if (chunks.length === 0) return [];
 
     // Simple batching (e.g. 100 chunks at a time to prevent payload too large)
@@ -34,7 +38,7 @@ export class EmbeddingService {
 
       while (retries > 0 && !success) {
         try {
-          const embeddings = await this.provider.embed(batch);
+          const embeddings = await this.provider.embed(batch, options);
           allEmbeddings.push(...embeddings);
           success = true;
         } catch (error) {

@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
-import type { IEmbeddingProvider } from './embedding-provider.interface';
+import type { EmbedCallOptions, IEmbeddingProvider } from './embedding-provider.interface';
 
 export class OpenAIEmbeddingProvider implements IEmbeddingProvider {
   public readonly provider = 'openai';
@@ -20,7 +20,7 @@ export class OpenAIEmbeddingProvider implements IEmbeddingProvider {
     this.openai = new OpenAI({ apiKey });
   }
 
-  async embed(texts: string[]): Promise<number[][]> {
+  async embed(texts: string[], _options?: EmbedCallOptions): Promise<number[][]> {
     try {
       const response = await this.openai.embeddings.create({
         input: texts,

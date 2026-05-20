@@ -6,6 +6,7 @@ import type { EmbeddingService } from '../../../embedding/domain/services/embedd
 import type { SearchService } from '../../domain/services/search.service';
 import type { RetrievalRequestDto } from '../dtos/retrieval-request.dto';
 import type { RetrievalResponseDto } from '../dtos/retrieval-response.dto';
+import { type RagContextLine, formatRagRetrievalMarkdown } from '../format-search-markdown';
 import { parseSearchFilters } from '../parse-search-filters';
 
 export class RagRetrievalUseCase {
@@ -20,7 +21,9 @@ export class RagRetrievalUseCase {
     const searchFilters = parseSearchFilters(userId, request.filters);
 
     // Embed the query
-    const embeddings = await this.embeddingService.embedBatch([request.query]);
+    const embeddings = await this.embeddingService.embedBatch([request.query], {
+      purpose: 'query',
+    });
     const queryVector = embeddings[0];
     if (!queryVector) {
       throw new Error('Failed to embed retrieval query');
@@ -36,7 +39,7 @@ export class RagRetrievalUseCase {
     );
 
     let currentTokens = 0;
-    const context = [];
+    const context: RagContextLine[] = [];
     const sourceIds = new Set<string>();
 
     for (const result of results) {
@@ -50,15 +53,19 @@ export class RagRetrievalUseCase {
       currentTokens += result.tokenCount;
       sourceIds.add(result.documentId);
 
+      const source: RagContextLine['source'] = {
+        documentId: result.documentId,
+        filename: result.filename,
+        chunkIndex: result.chunkIndex,
+      };
+      if (result.pageNumber !== undefined) {
+        source.pageNumber = result.pageNumber;
+      }
+
       context.push({
         text: result.content,
         score: result.similarityScore ?? 0,
-        source: {
-          documentId: result.documentId,
-          filename: result.filename,
-          pageNumber: result.pageNumber,
-          chunkIndex: result.chunkIndex,
-        },
+        source,
       });
 
       if (context.length >= request.topK) {
@@ -87,6 +94,12 @@ export class RagRetrievalUseCase {
 
     return {
       context,
+      markdown: formatRagRetrievalMarkdown(
+        request.query,
+        context,
+        currentTokens,
+        Array.from(sourceIds),
+      ),
       totalTokens: currentTokens,
       sources: Array.from(sourceIds),
       query: request.query,

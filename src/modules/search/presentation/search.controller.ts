@@ -10,6 +10,7 @@ import { HybridSearchUseCase } from '../application/use-cases/hybrid-search.use-
 import { KeywordSearchUseCase } from '../application/use-cases/keyword-search.use-case';
 import { RagRetrievalUseCase } from '../application/use-cases/rag-retrieval.use-case';
 import { SemanticSearchUseCase } from '../application/use-cases/semantic-search.use-case';
+import { StreamingSearchUseCase } from '../application/use-cases/streaming-search.use-case';
 import { SearchService } from '../domain/services/search.service';
 import { PgVectorSearchRepository } from '../infrastructure/pgvector-search.repository';
 
@@ -18,6 +19,7 @@ export class SearchController {
   private hybridSearchUseCase: HybridSearchUseCase;
   private keywordSearchUseCase: KeywordSearchUseCase;
   private ragRetrievalUseCase: RagRetrievalUseCase;
+  private streamingSearchUseCase: StreamingSearchUseCase;
 
   constructor() {
     const searchRepo = new PgVectorSearchRepository();
@@ -28,6 +30,7 @@ export class SearchController {
     this.hybridSearchUseCase = new HybridSearchUseCase(searchService, embeddingService);
     this.keywordSearchUseCase = new KeywordSearchUseCase(searchService);
     this.ragRetrievalUseCase = new RagRetrievalUseCase(searchService, embeddingService);
+    this.streamingSearchUseCase = new StreamingSearchUseCase(searchService, embeddingService);
   }
 
   async search(userId: string, body: unknown) {
@@ -44,6 +47,10 @@ export class SearchController {
         });
       }
       throw error;
+    }
+
+    if (request.streaming) {
+      return this.streamingSearchUseCase.execute(userId, request);
     }
 
     switch (request.searchType) {

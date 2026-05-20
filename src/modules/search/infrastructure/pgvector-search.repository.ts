@@ -55,10 +55,18 @@ function toSearchResult(
 
 function documentIdFilter(filter: SearchFilter): Prisma.Sql | null {
   if (filter.operator === 'eq') {
-    return Prisma.sql`c."documentId"::text = ${filter.value}`;
+    return Prisma.sql`c."documentId" = ${filter.value}`;
   }
   if (filter.operator === 'in' && Array.isArray(filter.value)) {
-    return Prisma.sql`c."documentId"::text = ANY(ARRAY[${Prisma.join(filter.value)}]::text[])`;
+    const ids = filter.value as unknown[];
+    if (ids.length === 0) {
+      return Prisma.sql`FALSE`;
+    }
+    // Single-element `Prisma.join()` can break placeholder SQL (PG 42601).
+    if (ids.length === 1) {
+      return Prisma.sql`c."documentId" = ${ids[0]}`;
+    }
+    return Prisma.sql`c."documentId" IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}`))})`;
   }
   return null;
 }
@@ -102,7 +110,9 @@ export class PgVectorSearchRepository implements ISearchRepository {
     const vectorString = `[${queryVector.join(',')}]`;
     const filterSql = this.buildFilterClauses(filters);
 
+    // One `::vector` cast (single placeholder). Repeating `${vectorString}::vector` can confuse Prisma/PG (42601).
     const result = await prisma.$queryRaw<SemanticSearchRow[]>`
+      WITH q AS (SELECT ${vectorString}::vector AS v)
       SELECT 
         c.id as "chunkId",
         c."documentId"::text,
@@ -111,13 +121,14 @@ export class PgVectorSearchRepository implements ISearchRepository {
         c."pageNumber",
         c."chunkIndex",
         c."tokenCount",
-        1 - (e.vector <=> ${vectorString}::vector) as "similarityScore"
+        1 - (e.vector <=> q.v) as "similarityScore"
       FROM document_chunks c
       JOIN embeddings e ON e."chunkId" = c.id
       JOIN documents d ON d.id = c."documentId"
-      WHERE 1 - (e.vector <=> ${vectorString}::vector) >= ${threshold}
+      CROSS JOIN q
+      WHERE 1 - (e.vector <=> q.v) >= ${threshold}
         ${filterSql}
-      ORDER BY e.vector <=> ${vectorString}::vector ASC
+      ORDER BY e.vector <=> q.v ASC
       LIMIT ${topK}
     `;
 
@@ -164,16 +175,25 @@ export class PgVectorSearchRepository implements ISearchRepository {
     const filterSql = this.buildFilterClauses(filters);
 
     const result = await prisma.$queryRaw<HybridSearchRow[]>`
-      WITH semantic_results AS (
+      WITH q AS (SELECT ${vectorString}::vector AS v),
+      eligible AS (
+        SELECT c.id AS chunk_id
+        FROM document_chunks c
+        JOIN documents d ON d.id = c."documentId"
+        WHERE 1 = 1
+        ${filterSql}
+      ),
+      semantic_results AS (
         SELECT 
           c.id as chunk_id,
-          ROW_NUMBER() OVER (ORDER BY e.vector <=> ${vectorString}::vector ASC) as rank,
-          1 - (e.vector <=> ${vectorString}::vector) as similarity_score
+          ROW_NUMBER() OVER (ORDER BY e.vector <=> q.v ASC) as rank,
+          1 - (e.vector <=> q.v) as similarity_score
         FROM document_chunks c
         JOIN embeddings e ON e."chunkId" = c.id
         JOIN documents d ON d.id = c."documentId"
-        WHERE 1 - (e.vector <=> ${vectorString}::vector) >= ${threshold}
-          ${filterSql}
+        INNER JOIN eligible el ON el.chunk_id = c.id
+        CROSS JOIN q
+        WHERE 1 - (e.vector <=> q.v) >= ${threshold}
         LIMIT ${topK * 2}
       ),
       keyword_results AS (
@@ -183,8 +203,8 @@ export class PgVectorSearchRepository implements ISearchRepository {
           ts_rank(c."contentTsv", plainto_tsquery('english', ${queryText})) as keyword_score
         FROM document_chunks c
         JOIN documents d ON d.id = c."documentId"
+        INNER JOIN eligible el ON el.chunk_id = c.id
         WHERE c."contentTsv" @@ plainto_tsquery('english', ${queryText})
-          ${filterSql}
         LIMIT ${topK * 2}
       ),
       combined AS (

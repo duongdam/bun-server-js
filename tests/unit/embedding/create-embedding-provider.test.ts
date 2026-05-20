@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createEmbeddingProvider } from '../../../src/modules/embedding/infrastructure/create-embedding-provider';
 import { GeminiEmbeddingProvider } from '../../../src/modules/embedding/infrastructure/providers/gemini.provider';
 import { HuggingFaceEmbeddingProvider } from '../../../src/modules/embedding/infrastructure/providers/huggingface.provider';
-import { LocalEmbeddingProvider } from '../../../src/modules/embedding/infrastructure/providers/local.provider';
 import { OpenAIEmbeddingProvider } from '../../../src/modules/embedding/infrastructure/providers/openai.provider';
 
 describe('createEmbeddingProvider', () => {
@@ -49,11 +48,6 @@ describe('createEmbeddingProvider', () => {
   test('returns HuggingFaceEmbeddingProvider for huggingface', () => {
     const p = createEmbeddingProvider('huggingface');
     expect(p).toBeInstanceOf(HuggingFaceEmbeddingProvider);
-  });
-
-  test('returns LocalEmbeddingProvider for local', () => {
-    const p = createEmbeddingProvider('local');
-    expect(p).toBeInstanceOf(LocalEmbeddingProvider);
   });
 
   test('throws for unsupported provider', () => {

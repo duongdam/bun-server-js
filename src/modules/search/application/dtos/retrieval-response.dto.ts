@@ -15,6 +15,8 @@ export const RetrievalContextSchema = z.object({
 
 export const RetrievalResponseSchema = z.object({
   context: z.array(RetrievalContextSchema),
+  /** CommonMark / GFM Markdown view of query + packed context. */
+  markdown: z.string(),
   totalTokens: z.number(),
   sources: z.array(z.string().uuid()),
   query: z.string(),

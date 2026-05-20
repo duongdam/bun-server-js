@@ -10,7 +10,7 @@
 
 ### User Story 1 - Gemini embeddings for indexing (Priority: P1)
 
-The platform generates chunk embeddings using **Google Gemini** as the **default** embedding backend (configurable model, e.g. `gemini-embedding-2`). Document upload and worker indexing use the same provider interface as other backends, but when `EMBEDDING_PROVIDER` is unset or set to `gemini`, the system uses the Gemini API with `GEMINI_API_KEY`.
+The platform generates chunk embeddings using **Google Gemini** as the **default** embedding backend (configurable model, e.g. `gemini-embedding-001`). Document upload and worker indexing use the same provider interface as other backends, but when `EMBEDDING_PROVIDER` is unset or set to `gemini`, the system uses the Gemini API with `GEMINI_API_KEY`.
 
 **Why this priority**: Search and RAG require vectors; Gemini as default aligns ingestion with the chosen stack.
 
@@ -67,7 +67,7 @@ Semantic and hybrid search embed the user query with the **same** default `Embed
 
 ## Assumptions
 
-- Gemini embedding model `gemini-embedding-2` supports truncation via `outputDimensionality` (default deployment uses **768** to match `vector(768)`); operators set `EMBEDDING_DIMENSION` or run the sync script after provider switches.
+- Gemini embedding model `gemini-embedding-001` supports truncation via `outputDimensionality` (default deployment uses **768** to match `vector(768)`); operators set `EMBEDDING_DIMENSION` or run the sync script after provider switches.
 - The Google Generative AI client library (`@google/generative-ai`) is acceptable as a runtime dependency.
 
 ## Testing *(mandatory for this feature)*

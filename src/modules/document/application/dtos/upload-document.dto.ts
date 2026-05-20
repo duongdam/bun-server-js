@@ -6,7 +6,7 @@ export const UploadDocumentSchema = z.object({
   chunkSize: z.coerce.number().min(64).max(2048).default(512),
   chunkOverlap: z.coerce.number().min(0).max(1024).default(50),
   embeddingProvider: z.string().default(process.env.EMBEDDING_PROVIDER || 'gemini'),
-  embeddingModel: z.string().default(process.env.EMBEDDING_MODEL || 'gemini-embedding-2'),
+  embeddingModel: z.string().default(process.env.EMBEDDING_MODEL || 'gemini-embedding-001'),
   tags: z.preprocess((val) => {
     if (typeof val === 'string') {
       try {

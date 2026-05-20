@@ -1,6 +1,6 @@
 import { HfInference } from '@huggingface/inference';
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
-import type { IEmbeddingProvider } from './embedding-provider.interface';
+import type { EmbedCallOptions, IEmbeddingProvider } from './embedding-provider.interface';
 
 export class HuggingFaceEmbeddingProvider implements IEmbeddingProvider {
   public readonly provider = 'huggingface';
@@ -21,7 +21,7 @@ export class HuggingFaceEmbeddingProvider implements IEmbeddingProvider {
     this.hf = new HfInference(apiKey);
   }
 
-  async embed(texts: string[]): Promise<number[][]> {
+  async embed(texts: string[], _options?: EmbedCallOptions): Promise<number[][]> {
     try {
       const results = await this.hf.featureExtraction({
         model: this.model,

@@ -1,9 +1,13 @@
 import { logger } from '../../../../shared/infrastructure/logger/pino.logger';
 import { prisma } from '../../../../shared/infrastructure/prisma/client';
 import type { SearchService } from '../../domain/services/search.service';
-import { parseSearchFilters } from '../parse-search-filters';
 import type { SearchRequestDto } from '../dtos/search-request.dto';
 import type { SearchResponseDto } from '../dtos/search-result.dto';
+import {
+  formatSearchResultsMarkdown,
+  searchResultsToMarkdownHits,
+} from '../format-search-markdown';
+import { parseSearchFilters } from '../parse-search-filters';
 
 export class KeywordSearchUseCase {
   constructor(private readonly searchService: SearchService) {}
@@ -39,16 +43,23 @@ export class KeywordSearchUseCase {
       logger.error({ err }, 'Failed to log search history');
     }
 
+    const resultDtos = results.map((r) => ({
+      chunkId: r.chunkId,
+      documentId: r.documentId,
+      filename: r.filename,
+      content: r.content,
+      pageNumber: r.pageNumber,
+      chunkIndex: r.chunkIndex,
+      rankScore: r.rankScore,
+    }));
+
     return {
-      results: results.map((r) => ({
-        chunkId: r.chunkId,
-        documentId: r.documentId,
-        filename: r.filename,
-        content: r.content,
-        pageNumber: r.pageNumber,
-        chunkIndex: r.chunkIndex,
-        rankScore: r.rankScore,
-      })),
+      results: resultDtos,
+      markdown: formatSearchResultsMarkdown(
+        request.query,
+        request.searchType,
+        searchResultsToMarkdownHits(results),
+      ),
       query: request.query,
       searchType: request.searchType,
       latencyMs,
